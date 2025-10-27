@@ -1,4 +1,0 @@
-Entry Time,Exit Time,Entry Price,Exit Price,Lots,Total Qty,Gross P&L,Commission,Net P&L,Exit Reason,Duration (min),Capital Outstanding
-,,,,,,,,,Starting Capital,,100000.0
-2025-07-18 11:08:05,2025-07-18 11:25:05,197.95,187.0,,450.0,-4980.21,52.71,-5032.93,Stop Loss,17.0,94967.07
-2025-07-18 11:44:07,2025-07-18 11:49:30,210.65,200.6,,375.0,-3815.87,47.12,-3862.99,Stop Loss,5.38,91104.08

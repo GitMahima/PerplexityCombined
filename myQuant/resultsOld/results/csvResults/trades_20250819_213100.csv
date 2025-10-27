@@ -1,5 +1,0 @@
-Entry Time,Exit Time,Entry Price,Exit Price,Lots,Total Qty,Gross P&L,Commission,Net P&L,Exit Reason,Duration (min),Capital Outstanding
-,,,,,,,,,Starting Capital,,100000.0
-2025-07-21 09:20:00,2025-07-21 09:20:53,185.55,196.6,,75.0,819.51,9.24,810.28,Take Profit 1,0.88,100810.28
-2025-07-21 09:20:00,2025-07-21 09:21:44,185.55,199.9,,375.0,5334.29,46.96,5287.33,Trailing Stop,1.73,106097.61
-2025-07-21 13:58:36,2025-07-21 14:03:24,142.9,132.2,,525.0,-5660.98,43.48,-5704.45,Stop Loss,4.8,100393.16

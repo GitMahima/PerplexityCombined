@@ -1,9 +1,0 @@
-{
-    "github.copilot.nextEditSuggestions.enabled": false,
-    "github.copilot.editor.enableAutoCompletions": false,
-    "codeium.enableConfig": { "*": false },
-    "geminicodeassist.inlineSuggestions.enableAuto": false,
-    "editor.formatOnSave": false,
-    "editor.codeActionsOnSave": {},
-    "editor.inlineSuggest.enabled": false
-}
