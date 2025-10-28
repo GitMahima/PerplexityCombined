@@ -416,28 +416,29 @@ class PositionManager:
     def _standardize_exit_reason(self, exit_reason: str) -> str:
         """
         Standardize exit reasons for strategy callbacks.
-        Maps various exit reason strings to standardized format for Control Base SL logic.
+        Maps various exit reason strings to standardized format for Control Base SL logic
+        and Price-Above-Exit Filter.
         """
         reason_lower = exit_reason.lower()
         
         # Map base stop loss variations (including just "stop loss" or "stop")
         if ('stop' in reason_lower and 'loss' in reason_lower) or reason_lower == 'stop loss':
-            return 'base_sl'
+            return 'Base SL'
         
         # Map take profit variations  
         if 'take profit' in reason_lower or 'target' in reason_lower:
-            return 'target_profit'
+            return 'Take Profit'
             
-        # Map trailing stop variations
-        if 'trailing' in reason_lower:
-            return 'trailing_stop'
+        # Map trailing stop variations - CRITICAL for Price-Above-Exit Filter
+        if 'trailing' in reason_lower or 'trail' in reason_lower:
+            return 'Trailing Stop'
             
         # Map session end
         if 'session' in reason_lower:
-            return 'session_end'
+            return 'Session End'
             
         # Return original for unmapped reasons
-        return exit_reason.lower()
+        return exit_reason
 
     def check_exit_conditions(self, position_id: str, current_price: float, timestamp: datetime) -> List[Tuple[int, str]]:
         if position_id not in self.positions:

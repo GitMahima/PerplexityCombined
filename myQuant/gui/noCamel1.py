@@ -304,6 +304,11 @@ class UnifiedTradingGUI(tk.Tk):
         self.ft_trail_activation = tk.StringVar(value=str(risk_config['trail_activation_points']))
         self.ft_trail_distance = tk.StringVar(value=str(risk_config['trail_distance_points']))
         self.ft_risk_per_trade = tk.StringVar(value=str(risk_config['risk_per_trade_percent']))
+        
+        # Forward Test Price-Above-Exit Filter (from defaults.py)
+        self.ft_price_above_exit_filter_enabled = tk.BooleanVar(value=risk_config['price_above_exit_filter_enabled'])
+        self.ft_price_buffer_points = tk.StringVar(value=str(risk_config['price_buffer_points']))
+        self.ft_filter_duration_seconds = tk.StringVar(value=str(risk_config['filter_duration_seconds']))
 
         # Forward Test Session management (from defaults.py)
         self.ft_is_intraday = tk.BooleanVar(value=session_config['is_intraday'])
@@ -995,7 +1000,28 @@ class UnifiedTradingGUI(tk.Tk):
         ttk.Entry(risk_frame, textvariable=self.ft_trail_distance, width=8).grid(row=3, column=4, padx=2)
         row += 1
 
-        # Add separator between Risk Management and Session Management
+        # === PRICE-ABOVE-EXIT FILTER SECTION ===
+        ttk.Label(parent, text="🛡️ Price-Above-Exit Filter", style='SectionHeader.TLabel').grid(row=row, column=0, columnspan=2, sticky="w", pady=(15,5))
+        row += 1
+        
+        filter_frame = ttk.Frame(parent)
+        filter_frame.grid(row=row, column=0, columnspan=2, sticky="ew", padx=10, pady=5)
+        
+        # Filter Enable checkbox
+        ttk.Checkbutton(filter_frame, text="Enable Filter", variable=self.ft_price_above_exit_filter_enabled).grid(row=0, column=0, sticky="w", padx=5, pady=2)
+        
+        # Price Buffer
+        ttk.Label(filter_frame, text="Price Buffer:").grid(row=0, column=1, sticky="e", padx=2)
+        ttk.Entry(filter_frame, textvariable=self.ft_price_buffer_points, width=8).grid(row=0, column=2, padx=2)
+        ttk.Label(filter_frame, text="pts").grid(row=0, column=3, sticky="w", padx=2)
+        
+        # Filter Duration
+        ttk.Label(filter_frame, text="Duration:").grid(row=0, column=4, sticky="e", padx=(15,2))
+        ttk.Entry(filter_frame, textvariable=self.ft_filter_duration_seconds, width=8).grid(row=0, column=5, padx=2)
+        ttk.Label(filter_frame, text="sec").grid(row=0, column=6, sticky="w", padx=2)
+        row += 1
+
+        # Add separator between Filter and Session Management
         self._add_grid_separator(parent, row)
         row += 1
 
@@ -2419,6 +2445,11 @@ class UnifiedTradingGUI(tk.Tk):
         config_dict['risk']['trail_activation_points'] = float(self.ft_trail_activation.get()) if self.ft_use_trail_stop.get() else 0.0
         config_dict['risk']['trail_distance_points'] = float(self.ft_trail_distance.get()) if self.ft_use_trail_stop.get() else 0.0
         config_dict['risk']['risk_per_trade_percent'] = float(self.ft_risk_per_trade.get())
+        
+        # Update Price-Above-Exit Filter from forward test GUI
+        config_dict['risk']['price_above_exit_filter_enabled'] = self.ft_price_above_exit_filter_enabled.get()
+        config_dict['risk']['price_buffer_points'] = float(self.ft_price_buffer_points.get())
+        config_dict['risk']['filter_duration_seconds'] = int(self.ft_filter_duration_seconds.get())
 
         # Update take profit from forward test GUI
         if self.ft_use_take_profit.get():
@@ -3139,6 +3170,23 @@ class UnifiedTradingGUI(tk.Tk):
         # Show noise filter if enabled
         if strategy_cfg['noise_filter_enabled']:
             lines.append(f"  Noise Filter:      {strategy_cfg['noise_filter_percentage']*100}% threshold")
+        
+        lines.append("")
+        
+        # Price-Above-Exit Filter Configuration
+        lines.append("PRICE-ABOVE-EXIT FILTER")
+        lines.append("-" * 40)
+        risk_cfg = config['risk']
+        if risk_cfg.get('price_above_exit_filter_enabled', False):
+            lines.append(f"Status:              ENABLED")
+            lines.append(f"Buffer Points:       {risk_cfg['price_buffer_points']} points")
+            lines.append(f"Filter Duration:     {risk_cfg['filter_duration_seconds']} seconds")
+            lines.append(f"Description:         After Base SL or Trailing Stop exit, blocks re-entry")
+            lines.append(f"                     until price > exit_price + {risk_cfg['price_buffer_points']} points")
+            lines.append(f"                     or {risk_cfg['filter_duration_seconds']}s elapsed")
+        else:
+            lines.append(f"Status:              DISABLED")
+            lines.append(f"Description:         Re-entry allowed immediately after any exit")
         
         lines.append("")
         

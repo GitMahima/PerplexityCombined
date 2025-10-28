@@ -89,6 +89,16 @@ class ModularIntradayStrategy:
             'session_start_time': None
         }
 
+        # Price-Above-Exit Filter state tracking
+        self.price_above_exit_filter_enabled = self.config_accessor.get_risk_param("price_above_exit_filter_enabled")
+        self.price_buffer_points = self.config_accessor.get_risk_param("price_buffer_points")
+        self.filter_duration_seconds = self.config_accessor.get_risk_param("filter_duration_seconds")
+        
+        # Filter tracking state
+        self.last_exit_reason = None
+        self.last_exit_price = None
+        self.last_exit_time = None
+
         # --- Feature flags (read from validated frozen config; GUI is SSOT) ---
         # ALL parameters MUST exist in defaults.py - no fallbacks allowed
         self.use_ema_crossover = self.config_accessor.get_strategy_param('use_ema_crossover')
@@ -214,15 +224,16 @@ class ModularIntradayStrategy:
         # Direct comparison using the simplified function
         return is_within_session(current_time, self.session_start, self.session_end)
 
-    def can_enter_new_position(self, current_time: datetime) -> bool:
+    def can_enter_new_position(self, current_time: datetime, current_price: float) -> bool:
         """
-        Check if new positions can be entered.
+        Unified entry validation - ALL gating conditions in one place.
         
         Args:
             current_time: Current timestamp
+            current_price: Current market price for filter validation
             
         Returns:
-            True if can enter new position
+            True if can enter new position, False if blocked by any condition
         """
         gating_reasons = []
         if not self.is_trading_session(current_time):
@@ -242,6 +253,25 @@ class ModularIntradayStrategy:
             gating_reasons.append(f"In no-trade end period ({current_time.time()} > {session_end.time()} - {self.no_trade_end_minutes}m)")
         if not self._check_consecutive_green_ticks():
             gating_reasons.append(f"Need {self.consecutive_green_bars_required} green ticks, have {self.green_bars_count}")
+        
+        # Price-Above-Exit Filter check (at END, after all other checks)
+        if self.price_above_exit_filter_enabled:
+            if self.last_exit_reason in ["Trailing Stop", "Base SL"] and self.last_exit_time is not None:
+                time_elapsed = (current_time - self.last_exit_time).total_seconds()
+                
+                # Check if filter is still active (not expired)
+                if time_elapsed <= self.filter_duration_seconds:
+                    min_required_price = self.last_exit_price + self.price_buffer_points
+                    
+                    if current_price < min_required_price:
+                        shortfall = min_required_price - current_price
+                        gating_reasons.append(
+                            f"Price-Above-Exit filter blocked | "
+                            f"Price ₹{current_price:.2f} < threshold ₹{min_required_price:.2f} "
+                            f"(shortfall {shortfall:.2f}pt) | "
+                            f"Elapsed {time_elapsed:.0f}s/{self.filter_duration_seconds}s"
+                        )
+        
         if gating_reasons:
             # LIGHTWEIGHT: Only enhance logging if we have cached price (no method calls)
             reason_text = '; '.join(gating_reasons)
@@ -349,10 +379,11 @@ class ModularIntradayStrategy:
 
     def on_position_exit(self, exit_info: Dict):
         """
-        Callback for position exits to handle Control Base SL logic.
+        Callback for position exits.
+        Handles BOTH Control Base SL logic AND Price-Above-Exit Filter tracking.
         
         Args:
-            exit_info: Dictionary containing exit details including exit_reason
+            exit_info: Dictionary containing exit details including exit_reason, exit_price, timestamp
         """
         # CRITICAL: Reset position state to allow new entries
         position_id = exit_info.get('position_id')
@@ -363,19 +394,37 @@ class ModularIntradayStrategy:
             self.position_entry_price = None
             logger.debug(f"Position state reset after exit: {position_id}")
         
-        # Handle Control Base SL logic
+        # Extract exit details
+        exit_reason = exit_info.get('exit_reason', '')
+        exit_price = exit_info.get('exit_price')
+        exit_time = exit_info.get('timestamp')
+        
+        # Price-Above-Exit Filter Tracking
+        if self.price_above_exit_filter_enabled:
+            # Check for both Trailing Stop and Base SL exits
+            if exit_reason in ["Trailing Stop", "Base SL"]:
+                self.last_exit_reason = exit_reason
+                self.last_exit_price = exit_price
+                self.last_exit_time = exit_time
+                
+                min_price = self.last_exit_price + self.price_buffer_points
+                logger.info(
+                    f"[FILTER] {exit_reason} exit at ₹{self.last_exit_price:.2f}. "
+                    f"Re-entry blocked until price > ₹{min_price:.2f} "
+                    f"or {self.filter_duration_seconds}s elapsed."
+                )
+        
+        # Control Base SL Logic
         if not self.control_base_sl_enabled:
             return
-            
-        exit_reason = exit_info.get('exit_reason', '').lower()
         
-        if 'base_sl' in exit_reason:
+        if 'Base SL' in exit_reason:
             self.last_exit_was_base_sl = True
             logger.info(
                 f"Base SL exit detected—next entry requires {self.base_sl_green_ticks} green ticks."
             )
         # Reset threshold on any profitable exit (TP or trailing stop)
-        elif exit_reason in ('target_profit', 'trailing_stop'):
+        elif exit_reason in ('Take Profit', 'Trailing Stop'):
             self.last_exit_was_base_sl = False
             logger.info(
                 f"Profitable exit detected—threshold reset to {self.consecutive_green_bars_required} green ticks."
@@ -687,30 +736,29 @@ class ModularIntradayStrategy:
         and not re-check conditions to avoid race condition bugs.
         """
         try:
-            # Check if we can enter new position (includes green tick validation)
-            if not self.in_position and self.can_enter_new_position(timestamp):
+            # Extract price first for validation
+            price = None
+            if 'close' in updated_tick:
+                price = updated_tick['close']
+            elif 'price' in updated_tick:
+                price = updated_tick['price']
+            
+            # Check if we can enter new position (includes green tick validation + price filter)
+            if not self.in_position and price is not None and self.can_enter_new_position(timestamp, price):
                 if self.entry_signal(updated_tick):
-                    # GRACEFUL: Extract price safely for live trading resilience
-                    price = None
-                    if 'close' in updated_tick:
-                        price = updated_tick['close']
-                    elif 'price' in updated_tick:
-                        price = updated_tick['price']
-                    
-                    if price is not None:
-                        # Reset Control Base SL threshold on successful entry
-                        if self.control_base_sl_enabled:
-                            self.last_exit_was_base_sl = False
-                            logger.info(
-                                f"Entry taken; threshold reset to {self.consecutive_green_bars_required} green ticks."
-                            )
-                        
-                        return TradingSignal(
-                            action="BUY",
-                            timestamp=timestamp,
-                            price=price,
-                            reason="Strategy entry signal"
+                    # Reset Control Base SL threshold on successful entry
+                    if self.control_base_sl_enabled:
+                        self.last_exit_was_base_sl = False
+                        logger.info(
+                            f"Entry taken; threshold reset to {self.consecutive_green_bars_required} green ticks."
                         )
+                    
+                    return TradingSignal(
+                        action="BUY",
+                        timestamp=timestamp,
+                        price=price,
+                        reason="Strategy entry signal"
+                    )
             
             # Check exit conditions for existing position
             should_exit, exit_reason = self.should_exit_for_session(timestamp)

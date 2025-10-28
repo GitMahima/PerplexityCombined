@@ -122,9 +122,31 @@ class DataSimulator:
         row = self.data.iloc[self.index]
         self.index += 1
         
-        # Create tick
+        # Extract timestamp from CSV (if available), otherwise use current time
+        if 'timestamp' in self.data.columns:
+            # CSV has timestamp column - use it (data simulation mode)
+            csv_timestamp = pd.to_datetime(row['timestamp'])
+            tick_timestamp = csv_timestamp
+            logger.debug(f"Using CSV timestamp: {csv_timestamp}")
+        elif 'Timestamp' in self.data.columns:
+            # Handle capitalized column name
+            csv_timestamp = pd.to_datetime(row['Timestamp'])
+            tick_timestamp = csv_timestamp
+            logger.debug(f"Using CSV timestamp: {csv_timestamp}")
+        elif 'datetime' in self.data.columns:
+            # Alternative timestamp column name
+            csv_timestamp = pd.to_datetime(row['datetime'])
+            tick_timestamp = csv_timestamp
+            logger.debug(f"Using CSV datetime: {csv_timestamp}")
+        else:
+            # No timestamp in CSV - fall back to current time
+            tick_timestamp = now_ist()
+            if self.index == 1:  # Log warning only once
+                logger.warning("CSV file has no timestamp column - using current time for trade times")
+        
+        # Create tick with timestamp from CSV
         tick = {
-            "timestamp": now_ist(),
+            "timestamp": tick_timestamp,
             "price": float(row['price']),
             "volume": int(row.get('volume', 1000))
         }

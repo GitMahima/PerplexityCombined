@@ -161,7 +161,11 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "stt_percent": 0.025,
         "exchange_charges_percent": 0.003,
         "gst_percent": 18.0,
-        "slippage_points": 0.0
+        "slippage_points": 0.0,
+        # Price-Above-Exit Filter (prevents re-entry after Base SL or Trailing Stop until price recovers)
+        "price_above_exit_filter_enabled": True,  # Enable filter
+        "price_buffer_points": 2.0,              # Points above exit price required
+        "filter_duration_seconds": 180           # Filter expires after this duration (3 min)
     },
     "capital": {
         "initial_capital": 100000.0
