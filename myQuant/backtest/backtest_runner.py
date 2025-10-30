@@ -35,23 +35,23 @@ import inspect
 import os
 import pandas as pd
 
-from utils.logger import setup_from_config, HighPerfLogger
+from ..utils.logger import setup_from_config, HighPerfLogger
 import logging
 # Module-level logger for utility functions only
 logger = logging.getLogger(__name__)
 
 # Time utilities (timezone handling, buffer helpers)
-from utils.time_utils import ensure_tz_aware, is_within_session, apply_buffer_to_time
+from ..utils.time_utils import ensure_tz_aware, is_within_session, apply_buffer_to_time
 
 # Data loader used by the centralized loader / runner
-from utils.simple_loader import load_data_simple
+from ..utils.simple_loader import load_data_simple
 
 # Position manager used by the runner
-from core.position_manager import PositionManager
+from ..core.position_manager import PositionManager
 
 # Strategy and results
-from core.researchStrategy import ModularIntradayStrategy
-from backtest.results import BacktestResults
+from ..core.researchStrategy import ModularIntradayStrategy
+from .results import BacktestResults
 
 # legacy smart_logger removed
 # (module-level stdlib logger removed — use self.perf_logger inside BacktestRunner)
@@ -128,7 +128,7 @@ class BacktestRunner:
         # All event logging uses self.perf_logger for consistency
 
         # Create strict config accessor (will raise KeyError on missing keys)
-        from utils.config_helper import ConfigAccessor
+        from ..utils.config_helper import ConfigAccessor
         self.config_accessor = ConfigAccessor(self.config)
         
         # Use performance logger for initialization messages
@@ -189,7 +189,7 @@ class BacktestRunner:
                         'exit_reason': trade['exit_reason'],
                     })
             # --- END FIX ---
-
+            
             # Now export results as before
             results_dir = self.config['backtest']['results_dir']
             # self.results.export_to_csv(output_dir=results_dir)
@@ -744,12 +744,14 @@ def add_indicator_signals_to_chunk(chunk_df: pd.DataFrame, config: Dict[str, Any
         chunk_df: DataFrame chunk with computed indicators
         config: Strategy configuration
     """
-    from core.indicators import (
-        calculate_ema_crossover_signals, calculate_macd_signals, 
-        calculate_vwap_signals, calculate_htf_signals, calculate_rsi_signals
+    from ..core.indicators import (
+        calculate_ema_crossover_signals,
+        calculate_macd_signals,
+        calculate_vwap_signals,
+        calculate_htf_signals,
+        calculate_rsi_signals,
     )
-    
-    # EMA Crossover Signals
+
     if config.get('use_ema_crossover', False) and 'fast_ema' in chunk_df.columns:
         ema_signals = calculate_ema_crossover_signals(
             chunk_df['fast_ema'],

@@ -138,19 +138,13 @@ class BrokerAdapter:
             self.SmartConnect = None
             logger.warning("SmartAPI not installed; live data streaming not available.")
             
-        # Try to import WebSocket streamer - prefer fully-qualified package path
+        # Import WebSocket streamer using relative import (folder-name independent)
         try:
-            # Prefer the canonical, fully-qualified import to avoid duplicate module instances
-            from myQuant.live.websocket_stream import WebSocketTickStreamer
+            from .websocket_stream import WebSocketTickStreamer
             self.WebSocketTickStreamer = WebSocketTickStreamer
         except ImportError:
-            try:
-                # Fallback to top-level 'live' package if present in sys.path
-                from .websocket_stream import WebSocketTickStreamer
-                self.WebSocketTickStreamer = WebSocketTickStreamer
-            except ImportError:
-                self.WebSocketTickStreamer = None
-                logger.warning("⚠️ WebSocket streaming not available - WebSocketTickStreamer could not be imported!")
+            self.WebSocketTickStreamer = None
+            logger.warning("⚠️ WebSocket streaming not available - WebSocketTickStreamer could not be imported!")
 
     def _init_tick_logging(self, config):
         """Initialize session-specific CSV tick logging for LIVE data only (no redundancy with historical files)"""

@@ -25,6 +25,7 @@ USAGE:
 """
 
 import logging
+logger = logging.getLogger(__name__)
 import sys
 import time
 import argparse
@@ -32,20 +33,14 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
 from itertools import product
 from datetime import datetime
-import pandas as pd
 
-from .matrix_config_builder import (
-    build_config_from_parameters,
-    validate_parameter_combination,
-    generate_test_tag
-)
+import pandas as pd
+from .matrix_config_builder import build_config_from_parameters, generate_test_tag, validate_parameter_combination
 from .matrix_results_exporter import export_matrix_results
 from ..utils.config_helper import freeze_config, validate_config
 from .data_simulator import DataSimulator
 from .broker_adapter import BrokerAdapter
 from .trader import LiveTrader
-
-logger = logging.getLogger(__name__)
 
 
 # ============================================================================
@@ -251,7 +246,9 @@ class MatrixTestRunner:
         # Export to Excel
         if output_filename is None:
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            output_filename = f"matrix_test_{timestamp}.xlsx"
+            # Extract CSV filename (without extension) to include in output name
+            csv_basename = self.csv_path.stem  # e.g., "aTest" from "aTest.csv"
+            output_filename = f"matrix_{csv_basename}_{timestamp}.xlsx"
         
         output_path = self.output_dir / output_filename
         export_matrix_results(

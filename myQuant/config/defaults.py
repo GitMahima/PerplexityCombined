@@ -253,8 +253,8 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "start_min": 15,
         "end_hour": 15,
         "end_min": 30,
-        "start_buffer_minutes": 5,
-        "end_buffer_minutes": 20,
+        "start_buffer_minutes": 20,
+        "end_buffer_minutes": 40,
         "no_trade_start_minutes": 5,
         "no_trade_end_minutes": 10,
         "timezone": "Asia/Kolkata"

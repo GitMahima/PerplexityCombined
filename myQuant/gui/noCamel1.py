@@ -36,14 +36,14 @@ from copy import deepcopy
 from types import MappingProxyType
 from typing import Dict, Any
 
-from utils.config_helper import create_config_from_defaults, validate_config, freeze_config, ConfigAccessor
-from backtest.backtest_runner import BacktestRunner
-from utils.cache_manager import refresh_symbol_cache, load_symbol_cache
-from live.trader import LiveTrader
-from live.forward_test_results import ForwardTestResults
+from ..utils.config_helper import create_config_from_defaults, validate_config, freeze_config, ConfigAccessor
+from ..backtest.backtest_runner import BacktestRunner
+from ..utils.cache_manager import refresh_symbol_cache, load_symbol_cache
+from ..live.trader import LiveTrader
+from ..live.forward_test_results import ForwardTestResults
 
-from config.defaults import DEFAULT_CONFIG
-from utils.logger import setup_from_config
+from ..config.defaults import DEFAULT_CONFIG
+from ..utils.logger import setup_from_config
 
 # Build, validate and freeze the canonical config (FAIL-FAST if defaults are invalid).
 # This ensures setup_from_config receives a proper MappingProxyType.
@@ -167,7 +167,6 @@ except KeyError as e:
 
 def now_ist():
     """Return current time in India Standard Time using SSOT timezone"""
-    from config.defaults import DEFAULT_CONFIG
     return datetime.now(pytz.timezone(DEFAULT_CONFIG['session']['timezone']))
 
 class UnifiedTradingGUI(tk.Tk):
@@ -2333,7 +2332,7 @@ class UnifiedTradingGUI(tk.Tk):
         logger.info("Building fresh configuration from current GUI state...")
         
         # 🚀 FRESH BUILD: Start with clean defaults, no caching
-        from config.defaults import DEFAULT_CONFIG
+        from ..config.defaults import DEFAULT_CONFIG
         config_dict = deepcopy(DEFAULT_CONFIG)  # Fresh baseline from defaults
         
         # 1. INSTRUMENT SELECTION (Primary - determines lot_size from SSOT)
@@ -2509,7 +2508,7 @@ class UnifiedTradingGUI(tk.Tk):
         }
         
         # Load SmartAPI credentials for live data streaming (required for both live and paper trading)
-        from config.defaults import load_live_trading_credentials
+        from ..config.defaults import load_live_trading_credentials
         credentials = load_live_trading_credentials()
         config_dict['live'].update(credentials)
         
@@ -2579,7 +2578,7 @@ class UnifiedTradingGUI(tk.Tk):
             
             # Import LiveTrader here to avoid circular imports
             try:
-                from live.trader import LiveTrader
+                from ..live.trader import LiveTrader
             except ImportError as e:
                 logger.error(f"Failed to import LiveTrader: {e}")
                 messagebox.showerror("Import Error", f"Could not import LiveTrader: {e}")

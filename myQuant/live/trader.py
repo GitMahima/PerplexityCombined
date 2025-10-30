@@ -36,8 +36,9 @@ def get_strategy(config):
     if not isinstance(config, MappingProxyType):
         raise TypeError(f"get_strategy requires frozen MappingProxyType config, got {type(config)}")
     
-    strat_module = importlib.import_module("myQuant.core.liveStrategy")
-    ind_mod = importlib.import_module("myQuant.core.indicators")
+    # Use package-aware relative imports so module resolution is independent of root folder name
+    strat_module = importlib.import_module('.liveStrategy', package='myQuant.core')
+    ind_mod = importlib.import_module('.indicators', package='myQuant.core')
     return strat_module.ModularIntradayStrategy(config, ind_mod)
 
 class LiveTrader:

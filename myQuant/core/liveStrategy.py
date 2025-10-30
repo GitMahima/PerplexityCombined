@@ -142,10 +142,7 @@ class ModularIntradayStrategy:
             raise
 
         # Log session configuration via high-perf logger (concise lifecycle event)
-        self.perf_logger.session_start(
-            f"Session configured: {self.session_start.strftime('%H:%M')} to {self.session_end.strftime('%H:%M')} "
-            f"buffers=+{self.start_buffer_minutes}/-{self.end_buffer_minutes}m"
-        )
+        from . import indicators
 
         # EMA parameters
         self.fast_ema = self.config_accessor.get_strategy_param('fast_ema')

@@ -26,7 +26,7 @@ try:
     from openpyxl.worksheet.page import PageMargins
     
     # Import shared dashboard components
-    from shared.dashboard_components import (
+    from ..shared.dashboard_components import (
         DashboardStyleManager, 
         DashboardLayoutManager, 
         DashboardTableBuilder
@@ -39,7 +39,7 @@ except ImportError:
 
 # Type annotations for optional imports
 if TYPE_CHECKING:
-    from shared.dashboard_components import (
+    from ..shared.dashboard_components import (
         DashboardStyleManager, 
         DashboardLayoutManager, 
         DashboardTableBuilder
@@ -147,7 +147,15 @@ class ForwardTestResults:
         symbol = self.config.get('instrument', {}).get('symbol', 'UNKNOWN')
         symbol_clean = symbol.replace('/', '_').replace('\\', '_')  # Clean symbol for filename
         
-        filename = os.path.join(results_dir, f"ft-{symbol_clean}-{timestamp}-{detected_mode}.xlsx")
+        # Extract CSV filename if available (for data simulation)
+        data_source = ""
+        file_path = self.config.get('data_simulation', {}).get('file_path', '')
+        if file_path:
+            from pathlib import Path
+            csv_basename = Path(file_path).stem  # e.g., "aTest" from "aTest.csv"
+            data_source = f"-{csv_basename}"
+        
+        filename = os.path.join(results_dir, f"ft{data_source}-{symbol_clean}-{timestamp}-{detected_mode}.xlsx")
 
         
 
