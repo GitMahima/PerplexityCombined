@@ -11,7 +11,7 @@ import os
 
 logger = logging.getLogger(__name__)
 
-from config.defaults import DEFAULT_CONFIG
+from ..config.defaults import DEFAULT_CONFIG
 
 # Import Angel One compatibility validation
 try:

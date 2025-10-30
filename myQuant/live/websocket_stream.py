@@ -23,7 +23,7 @@ import pytz
 from datetime import datetime
 
 # Import timezone from SSOT
-from utils.time_utils import IST
+from ..utils.time_utils import IST
 
 try:
     from SmartApi.smartWebSocketV2 import SmartWebSocketV2  # Capital 'A' - correct package name
@@ -31,7 +31,7 @@ except ImportError:
     SmartWebSocketV2 = None  # Install with pip install smartapi-python
 
 # Import Angel One exchange type mapper
-from utils.exchange_mapper import map_to_angel_exchange_type
+from ..utils.exchange_mapper import map_to_angel_exchange_type
 
 logger = logging.getLogger(__name__)
 
@@ -282,7 +282,7 @@ if __name__ == "__main__":
     client_code = session["client_code"]
     feed_token = session["feed_token"]
     # Load three sample tokens from symbol cache
-    from utils.cache_manager import load_symbol_cache
+    from ..utils.cache_manager import load_symbol_cache
     symbols = load_symbol_cache()
     test_tokens = [v for (k, v) in list(symbols.items())[:3]]
     def print_tick(tick, symbol):

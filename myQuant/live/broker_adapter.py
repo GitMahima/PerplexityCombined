@@ -33,7 +33,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any, Callable
 
-from utils.time_utils import now_ist, normalize_datetime_to_ist, IST
+from ..utils.time_utils import now_ist, normalize_datetime_to_ist, IST
 
 from types import MappingProxyType
 
@@ -68,7 +68,7 @@ class BrokerAdapter:
         self.params = config
         
         # Use strict config access - fail immediately if sections missing
-        from utils.config_helper import ConfigAccessor
+        from ..utils.config_helper import ConfigAccessor
         self.config_accessor = ConfigAccessor(config)
         
         self.live_params = config["live"]
@@ -125,7 +125,7 @@ class BrokerAdapter:
         if config.get('data_simulation', {}).get('enabled', False):
             file_path = config.get('data_simulation', {}).get('file_path', '')
             if file_path:
-                from live.data_simulator import DataSimulator
+                from .data_simulator import DataSimulator
                 # DataSimulator only takes file_path parameter
                 self.file_simulator = DataSimulator(file_path)
                 logger.info(f"File simulation enabled with: {file_path}")
@@ -146,7 +146,7 @@ class BrokerAdapter:
         except ImportError:
             try:
                 # Fallback to top-level 'live' package if present in sys.path
-                from live.websocket_stream import WebSocketTickStreamer
+                from .websocket_stream import WebSocketTickStreamer
                 self.WebSocketTickStreamer = WebSocketTickStreamer
             except ImportError:
                 self.WebSocketTickStreamer = None
@@ -349,7 +349,7 @@ class BrokerAdapter:
     # Additional methods would be implemented here for full functionality...
     def _connect_with_retry(self):
         """Establish SmartAPI connection with retry logic for live data streaming"""
-        from live.login import SmartAPISessionManager
+        from .login import SmartAPISessionManager
         
         live = self.live_params
         logger.info("🔌 Establishing SmartAPI connection for live data streaming...")

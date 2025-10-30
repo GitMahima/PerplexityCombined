@@ -1080,7 +1080,7 @@ class ForwardTestResults:
     def _get_dialog_box_text(self) -> str:
         """
         Get the exact text that appears in the dialog box.
-        Prioritizes self.dialog_text if provided (from GUI), otherwise generates from config.
+        Prioritizes self.dialog_text if provided (from GUI), otherwise generates from ..config.
         """
         # PRIORITY 1: Use dialog_text passed from GUI if available
         if hasattr(self, 'dialog_text') and self.dialog_text:

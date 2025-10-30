@@ -19,8 +19,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 import logging
 import uuid
-from utils.config_helper import ConfigAccessor
-from utils.time_utils import now_ist, is_within_session, apply_buffer_to_time
+from ..utils.config_helper import ConfigAccessor
+from ..utils.time_utils import now_ist, is_within_session, apply_buffer_to_time
 
 logger = logging.getLogger(__name__)
 
@@ -209,7 +209,7 @@ class PositionManager:
         if dt is None:
             return None
         if dt.tzinfo is None:
-            from utils.time_utils import IST
+            from ..utils.time_utils import IST
             return IST.localize(dt)
         return dt
 

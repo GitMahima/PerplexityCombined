@@ -25,7 +25,7 @@ from datetime import datetime
 from typing import Dict, Optional
 
 try:
-    from utils.time_utils import now_ist
+    from ..utils.time_utils import now_ist
 except ImportError:
     from myQuant.utils.time_utils import now_ist
 

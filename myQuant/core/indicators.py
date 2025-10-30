@@ -7,7 +7,7 @@ import pandas as pd
 import numpy as np
 import logging
 from typing import Dict, Tuple, Any
-from utils.config_helper import ConfigAccessor
+from ..utils.config_helper import ConfigAccessor
 
 logger = logging.getLogger(__name__)
 

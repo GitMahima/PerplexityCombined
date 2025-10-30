@@ -13,11 +13,11 @@ import logging
 import importlib
 import pandas as pd
 from types import MappingProxyType
-from core.position_manager import PositionManager
-from live.broker_adapter import BrokerAdapter
-from live.forward_test_results import ForwardTestResults
-from utils.time_utils import now_ist
-from utils.config_helper import validate_config, freeze_config, create_config_from_defaults
+from ..core.position_manager import PositionManager
+from .broker_adapter import BrokerAdapter
+from .forward_test_results import ForwardTestResults
+from ..utils.time_utils import now_ist
+from ..utils.config_helper import validate_config, freeze_config, create_config_from_defaults
 
 # Module-level logger
 logger = logging.getLogger(__name__)
@@ -36,8 +36,8 @@ def get_strategy(config):
     if not isinstance(config, MappingProxyType):
         raise TypeError(f"get_strategy requires frozen MappingProxyType config, got {type(config)}")
     
-    strat_module = importlib.import_module("core.liveStrategy")
-    ind_mod = importlib.import_module("core.indicators")
+    strat_module = importlib.import_module("myQuant.core.liveStrategy")
+    ind_mod = importlib.import_module("myQuant.core.indicators")
     return strat_module.ModularIntradayStrategy(config, ind_mod)
 
 class LiveTrader:
@@ -517,6 +517,7 @@ class LiveTrader:
                             self.close_position("Session End")
                             logger.info(f"🛑 Session ended - stopping trading: {exit_reason}")
                             logger.info("All positions flattened (if any).")
+                            self.is_running = False  # Stop processing further ticks
                             _pre_convergence_instrumentor.end_trader_tick()
                             return
             else:
@@ -527,6 +528,7 @@ class LiveTrader:
                         self.close_position("Session End")
                         logger.info(f"🛑 Session ended - stopping trading: {exit_reason}")
                         logger.info("All positions flattened (if any).")
+                        self.is_running = False  # Stop processing further ticks
                         return
             
             # Phase 1.5: Measure signal handling preparation
