@@ -565,7 +565,24 @@ class ModularIntradayStrategy:
             self._signal_log_counter = 0
         
         self._signal_log_counter += 1
-        current_time = datetime.now()
+        # Prefer the tick timestamp (from row) for any logging or time-based checks
+        # in forward-test/file-simulations so logs show CSV times, not runtime now().
+        # Fallback to now_ist() if timestamp not present or invalid.
+        current_time = None
+        try:
+            if isinstance(row, (pd.Series, dict)) and 'timestamp' in row and row['timestamp'] is not None:
+                current_time = row['timestamp']
+                # Convert pandas Timestamp to python datetime if needed
+                if hasattr(current_time, 'to_pydatetime'):
+                    current_time = current_time.to_pydatetime()
+                # Ensure timezone-aware
+                current_time = ensure_tz_aware(current_time, getattr(self, 'timezone', None))
+        except Exception:
+            current_time = None
+
+        if current_time is None:
+            # Last resort: use system now in IST (preserves timezone-awareness)
+            current_time = now_ist()
         
         # Log every 300 ticks (~30 seconds at 10 ticks/sec) or when signal changes
         should_log = (
@@ -701,6 +718,17 @@ class ModularIntradayStrategy:
                 return None
             timestamp = tick['timestamp']
             
+            # DIAGNOSTIC LOGGING: show timestamp details for first few ticks
+            try:
+                if not hasattr(self, '_tick_log_count'):
+                    self._tick_log_count = 0
+                self._tick_log_count += 1
+                if self._tick_log_count <= 5:
+                    tzinfo = getattr(timestamp, 'tzinfo', None)
+                    time_comp = getattr(timestamp, 'time', lambda: None)()
+                    logger.info(f"[liveStrategy.on_tick] Tick #{self._tick_log_count}: timestamp={timestamp}, time component={time_comp}, timezone={tzinfo}")
+            except Exception:
+                logger.debug("[STRATEGY] Diagnostic timestamp logging failed")
             # Phase 1: Measure signal evaluation
             if self.instrumentation_enabled:
                 with self.instrumentor.measure('signal_eval'):

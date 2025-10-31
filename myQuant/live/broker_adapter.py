@@ -256,6 +256,18 @@ class BrokerAdapter:
             tick = self.file_simulator.get_next_tick()
             if tick:
                 self.last_price = tick['price']
+                # DIAGNOSTIC LOGGING: count and show first few ticks from file simulator
+                if hasattr(self, '_file_tick_count'):
+                    self._file_tick_count += 1
+                else:
+                    self._file_tick_count = 1
+
+                if self._file_tick_count <= 5:
+                    try:
+                        logger.info(f"[BrokerAdapter.get_next_tick] File simulator tick #{self._file_tick_count}: timestamp={tick.get('timestamp')}, price={tick.get('price')}")
+                    except Exception:
+                        logger.debug("[BrokerAdapter] Failed to log file simulator tick diagnostic")
+
                 self._buffer_tick(tick)
             return tick
         

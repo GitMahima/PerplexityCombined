@@ -147,7 +147,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "risk": {
         "max_positions_per_day": 100,
         "base_sl_points": 15.0,
-        "tp_points": [5.0, 12.0, 20.0, 30.0],
+        "tp_points": [5.0, 12.0, 15.0, 17.0],
         "tp_percents": [0.40, 0.30, 0.20, 0.10],
         "use_trail_stop": True,
         "trail_activation_points": 5.0,

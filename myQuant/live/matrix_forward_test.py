@@ -517,6 +517,7 @@ Examples:
     parser.add_argument('--control-base-sl-ticks', help='Control base SL green ticks (comma-separated)')
     parser.add_argument('--price-buffer', help='Price buffer points (comma-separated)')
     parser.add_argument('--filter-duration', help='Filter duration seconds (comma-separated)')
+    parser.add_argument('--session-start-buffer-minutes', help='Session start buffer minutes (comma-separated)')
     
     # Fixed parameters
     parser.add_argument('--fixed', action='append', help='Fixed parameter (format: name=value)')
@@ -552,6 +553,7 @@ def main():
         'control_base_sl_green_ticks': args.control_base_sl_ticks,
         'price_buffer_points': args.price_buffer,
         'filter_duration_seconds': args.filter_duration,
+        'start_buffer_minutes': args.session_start_buffer_minutes,
     }
     
     for param_name, cli_value in param_mapping.items():

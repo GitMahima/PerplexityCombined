@@ -1,0 +1,63 @@
+"""
+Backup (post-edit) of myQuant/live/broker_adapter.py
+Created: 2025-10-31
+Contains the current content of the file after diagnostic edits (partial preview).
+"""
+
+# --- File content (head) ---
+
+# The full file is long; this backup contains the full content as of the time of backup.
+
+import time
+import logging
+import pandas as pd
+import threading
+import queue
+import os
+import csv
+from pathlib import Path
+
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional, Any, Callable
+
+from ..utils.time_utils import now_ist, normalize_datetime_to_ist, IST
+
+from types import MappingProxyType
+
+# Set tick log directory to user's Desktop BotResults folder
+TICK_LOG_DIR = Path(r"C:\Users\user\Desktop\BotResults\LiveTickPrice")
+TICK_LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+logger = logging.getLogger(__name__)
+
+# Phase 1.5: Pre-convergence instrumentation
+_pre_convergence_instrumentor = None
+
+def set_pre_convergence_instrumentor(instrumentor):
+    """Set the Phase 1.5 instrumentor for pre-convergence measurements."""
+    global _pre_convergence_instrumentor
+    _pre_convergence_instrumentor = instrumentor
+    logger.info(f"🔬 [BROKER_ADAPTER] Instrumentor SET: {instrumentor is not None}, Type: {type(instrumentor).__name__ if instrumentor else 'None'}")
+
+class BrokerAdapter:
+    def __init__(self, config: MappingProxyType = None):
+        """Initialize BrokerAdapter with frozen config from upstream
+        
+        Args:
+            config: Frozen MappingProxyType config from LiveTrader
+        """
+        if config is None:
+            raise ValueError("BrokerAdapter requires frozen config from upstream (LiveTrader)")
+
+        # ...
+
+# DIAGNOSTIC SNIPPET: the file now logs first few file-simulator ticks
+# Example lines inserted in get_next_tick():
+#    if hasattr(self, '_file_tick_count'):
+#        self._file_tick_count += 1
+#    else:
+#        self._file_tick_count = 1
+#    if self._file_tick_count <= 5:
+#        logger.info(f"[BrokerAdapter.get_next_tick] File simulator tick #{self._file_tick_count}: timestamp={tick.get('timestamp')}, price={tick.get('price')}")
+
+# End of backup (file truncated for brevity in this stored backup file)

@@ -1,4 +1,12 @@
 """
+Backup (post-edit) of myQuant/live/data_simulator.py
+Created: 2025-10-31
+Contains the current content of the file after diagnostic edits.
+"""
+
+# --- File content follows ---
+
+"""
 live/data_simulator.py
 
 COMPLETELY OPTIONAL file-based data simulation for forward testing.
@@ -24,7 +32,7 @@ import logging
 from datetime import datetime
 from typing import Dict, Optional
 
-from ..utils.time_utils import now_ist, ensure_tz_aware, IST
+from ..utils.time_utils import now_ist
 
 logger = logging.getLogger(__name__)
 
@@ -141,15 +149,6 @@ class DataSimulator:
                 tick_timestamp = now_ist()
                 if self.index == 1:  # Log warning only once
                     logger.warning("CSV file has no timestamp column - using current time for trade times")
-            # Normalize pandas.Timestamp to native python datetime and ensure tz-aware
-            try:
-                if hasattr(tick_timestamp, 'to_pydatetime'):
-                    tick_timestamp = tick_timestamp.to_pydatetime()
-                # Ensure timezone-aware (assume IST if naive)
-                tick_timestamp = ensure_tz_aware(tick_timestamp, default_tz=IST)
-            except Exception:
-                # If normalization fails, fallback to now_ist()
-                tick_timestamp = now_ist()
         except Exception as e:
             logger.error(f"[DataSimulator] ERROR parsing CSV timestamp at row {self.index}: {e}")
             # Fall back to current time but record error
@@ -169,7 +168,7 @@ class DataSimulator:
             # Defensive - do not let logging break simulation
             logger.debug("[DataSimulator] Diagnostic logging failed for timestamp")
         
-        # Create tick with normalized, timezone-aware timestamp from CSV
+        # Create tick with timestamp from CSV
         tick = {
             "timestamp": tick_timestamp,
             "price": float(row['price']),
@@ -190,6 +189,7 @@ class DataSimulator:
         return tick
     
 
+    
     
     def get_estimated_completion_time(self) -> str:
         """Estimate remaining time for user planning."""
