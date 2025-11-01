@@ -2439,6 +2439,10 @@ class UnifiedTradingGUI(tk.Tk):
         from ..config.defaults import DEFAULT_CONFIG
         config_dict = deepcopy(DEFAULT_CONFIG)  # Fresh baseline from defaults
         
+        # DEBUG: Verify SL Regression params are in deepcopy
+        logger.warning(f"[CONFIG DEBUG] After deepcopy, sl_regression_enabled = {config_dict.get('risk', {}).get('sl_regression_enabled', 'MISSING')}")
+        logger.warning(f"[CONFIG DEBUG] risk keys after deepcopy: {list(config_dict.get('risk', {}).keys())}")
+        
         # 1. INSTRUMENT SELECTION (Primary - determines lot_size from SSOT)
         selected_instrument = self.ft_instrument_type.get()
         

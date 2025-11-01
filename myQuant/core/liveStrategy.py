@@ -98,6 +98,26 @@ class ModularIntradayStrategy:
         self.last_exit_reason = None
         self.last_exit_price = None
         self.last_exit_time = None
+        
+        # SL Regression configuration and state tracking
+        self.sl_regression_enabled = self.config_accessor.get_risk_param("sl_regression_enabled")
+        self.max_base_sl = self.config_accessor.get_risk_param("max_base_sl")
+        self.min_base_sl = self.config_accessor.get_risk_param("min_base_sl")
+        self.sl_regression_step = self.config_accessor.get_risk_param("sl_regression_step")
+        self.sl_regression_window_minutes = self.config_accessor.get_risk_param("sl_regression_window_minutes")
+        
+        # SL Regression runtime state
+        self.current_base_sl = self.max_base_sl  # Starts at max, reduces on SL exits
+        self.last_sl_exit_time = None  # Timestamp of last SL exit (Trail or Base)
+        
+        # DEBUG: Log SL Regression initialization
+        if self.sl_regression_enabled:
+            logger.warning(
+                f"[SL REGRESSION] ENABLED - max={self.max_base_sl}, min={self.min_base_sl}, "
+                f"step={self.sl_regression_step}, window={self.sl_regression_window_minutes}min"
+            )
+        else:
+            logger.info("[SL REGRESSION] Disabled")
 
         # --- Feature flags (read from validated frozen config; GUI is SSOT) ---
         # ALL parameters MUST exist in defaults.py - no fallbacks allowed
@@ -260,6 +280,60 @@ class ModularIntradayStrategy:
         
         return False, ""
 
+    def _reduce_base_sl_on_exit(self, exit_time: datetime):
+        """
+        Reduce Base SL after any SL exit (Trail or Base) - Simple event-driven approach.
+        
+        Args:
+            exit_time: Timestamp of the SL exit
+        """
+        if not self.sl_regression_enabled:
+            return
+        
+        # Reduce Base SL by step (with floor at min_base_sl)
+        old_sl = self.current_base_sl
+        self.current_base_sl = max(self.current_base_sl - self.sl_regression_step, self.min_base_sl)
+        
+        # Log reduction and reset timer ONLY if Base SL actually changed
+        if self.current_base_sl < old_sl:
+            # Base SL reduced - reset timer
+            self.last_sl_exit_time = exit_time
+            logger.warning(
+                f"[SL REGRESSION] Base SL reduced: {old_sl:.1f} → {self.current_base_sl:.1f} pts | "
+                f"Timer reset: {self.sl_regression_window_minutes} min from now"
+            )
+        else:
+            # Already at floor - don't reset timer (allow reversion if quiet period)
+            logger.info(
+                f"[SL REGRESSION] Base SL at minimum: {self.current_base_sl:.1f} pts (floor) | "
+                f"Timer NOT reset - will revert after quiet period"
+            )
+
+    def _check_sl_regression_timer(self, current_time: datetime):
+        """
+        Check if regression window has expired and revert Base SL to max.
+        
+        Args:
+            current_time: Current timestamp to check against last SL exit time
+        """
+        if not self.sl_regression_enabled or self.last_sl_exit_time is None:
+            return
+        
+        # Check if window has expired
+        time_since_last_exit = (current_time - self.last_sl_exit_time).total_seconds() / 60  # minutes
+        
+        if time_since_last_exit >= self.sl_regression_window_minutes:
+            # Revert to max Base SL
+            old_sl = self.current_base_sl
+            self.current_base_sl = self.max_base_sl
+            self.last_sl_exit_time = None  # Clear timer
+            
+            if old_sl < self.max_base_sl:
+                logger.info(
+                    f"[SL REGRESSION] Timer expired ({time_since_last_exit:.1f} min) | "
+                    f"Base SL reverted: {old_sl:.1f} → {self.max_base_sl:.1f} pts"
+                )
+
     def can_enter_new_position(self, current_time: datetime, current_price: float) -> bool:
         """
         Unified entry validation - ALL gating conditions in one place.
@@ -273,7 +347,10 @@ class ModularIntradayStrategy:
         """
         gating_reasons = []
         
-        # Check trade blocks FIRST (highest priority - user-defined restriction)
+        # Check SL Regression timer FIRST (updates state if needed)
+        self._check_sl_regression_timer(current_time)
+        
+        # Check trade blocks SECOND (highest priority - user-defined restriction)
         is_blocked, block_desc = self.is_within_trade_block(current_time)
         if is_blocked:
             gating_reasons.append(f"Within trade block: {block_desc}")
@@ -455,6 +532,10 @@ class ModularIntradayStrategy:
                     f"Re-entry blocked until price > ₹{min_price:.2f} "
                     f"or {self.filter_duration_seconds}s elapsed."
                 )
+        
+        # SL Regression - Reduce Base SL after any SL exit
+        if exit_reason in ["Trailing Stop", "Base SL"]:
+            self._reduce_base_sl_on_exit(exit_time)
         
         # Control Base SL Logic
         if not self.control_base_sl_enabled:
@@ -672,10 +753,15 @@ class ModularIntradayStrategy:
 
         # Use instrument SSOT for contract sizing (no risk.lot_size overrides)
         # PositionManager handles lot_size and tick_size internally via SSOT
+        
+        # Get current Base SL (may be regressed if SL Regression is active)
+        current_base_sl_to_use = self.current_base_sl if self.sl_regression_enabled else None
+        
         position_id = position_manager.open_position(
             symbol=symbol,
             entry_price=entry_price,
-            timestamp=now
+            timestamp=now,
+            base_sl_points_override=current_base_sl_to_use
         )
 
         if position_id:
@@ -685,6 +771,13 @@ class ModularIntradayStrategy:
             self.position_entry_price = entry_price
             self.daily_stats['trades_today'] += 1
             self.last_signal_time = now
+            
+            # Log if using regressed Base SL
+            if self.sl_regression_enabled and self.current_base_sl < self.max_base_sl:
+                logger.info(
+                    f"[SL REGRESSION] Position opened with REDUCED Base SL: "
+                    f"{self.current_base_sl:.1f} pts (normal: {self.max_base_sl:.1f} pts)"
+                )
 
             # Get lot_size from SSOT for logging purposes
             try:

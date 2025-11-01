@@ -165,7 +165,14 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         # Price-Above-Exit Filter (prevents re-entry after Base SL or Trailing Stop until price recovers)
         "price_above_exit_filter_enabled": True,  # Enable filter
         "price_buffer_points": 2.0,              # Points above exit price required
-        "filter_duration_seconds": 180           # Filter expires after this duration (3 min)
+        "filter_duration_seconds": 180,          # Filter expires after this duration (3 min)
+        
+        # SL Regression (reduces Base SL after any SL exit to minimize consecutive losses)
+        "sl_regression_enabled": True,          # Master switch for SL regression feature
+        "max_base_sl": 15.0,                     # Starting Base SL (normal conditions)
+        "min_base_sl": 5.0,                      # Floor - Base SL cannot go below this
+        "sl_regression_step": 5.0,               # Points to reduce after each SL exit
+        "sl_regression_window_minutes": 20       # Minutes before reverting to max (after last SL exit)
     },
     "capital": {
         "initial_capital": 100000.0

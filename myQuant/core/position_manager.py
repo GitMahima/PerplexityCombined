@@ -84,7 +84,7 @@ class ExitReason(Enum):
     TAKE_PROFIT_2 = "Take Profit 2"
     TAKE_PROFIT_3 = "Take Profit 3"
     TAKE_PROFIT_4 = "Take Profit 4"
-    STOP_LOSS = "Stop Loss"
+    STOP_LOSS = "Base SL"  # Standardized to "Base SL" throughout codebase
     TRAILING_STOP = "Trailing Stop"
     SESSION_END = "Session End"
     STRATEGY_EXIT = "Strategy Exit"
@@ -273,12 +273,30 @@ class PositionManager:
         }
 
     def open_position(self, symbol: str, entry_price: float, timestamp: datetime,
-                      order_type: OrderType = OrderType.MARKET) -> Optional[str]:
+                      order_type: OrderType = OrderType.MARKET,
+                      base_sl_points_override: Optional[float] = None) -> Optional[str]:
+        """
+        Open a new long position.
+        
+        Args:
+            symbol: Trading symbol
+            entry_price: Entry price
+            timestamp: Entry timestamp
+            order_type: Market or limit order
+            base_sl_points_override: Optional override for base_sl_points (used by SL Regression)
+        
+        Returns:
+            Position ID if successful, None otherwise
+        """
         if order_type == OrderType.MARKET:
             actual_entry_price = entry_price + self.slippage_points
         else:
             actual_entry_price = entry_price
-        stop_loss_price = actual_entry_price - self.base_sl_points
+        
+        # Use override if provided (SL Regression), otherwise use config default
+        base_sl = base_sl_points_override if base_sl_points_override is not None else self.base_sl_points
+        stop_loss_price = actual_entry_price - base_sl
+        
         lots, quantity, lot_size_used = self.calculate_position_size_in_lots(
             actual_entry_price, stop_loss_price)
 
@@ -387,16 +405,14 @@ class PositionManager:
         self.daily_pnl += net_pnl
         logger.info("Closed position %s", position_id)
         logger.info("Lots closed: %s (%s units)", lots_closed, quantity_to_close)
-        logger.info("Exit price: â‚¹%.2f per unit", exit_price)
-        logger.info("P&L: â‚¹%.2f (%s)", net_pnl, exit_reason)
+        logger.info("Exit price: ₹%.2f per unit", exit_price)
+        logger.info("P&L: ₹%.2f (%s)", net_pnl, exit_reason)
         
-        # Call strategy callback with standardized exit info
+        # Call strategy callback with exit info (already standardized from ExitReason enum)
         if self.strategy_callback:
-            # Map exit reasons to standardized format
-            standardized_reason = self._standardize_exit_reason(exit_reason)
             exit_info = {
                 'position_id': position_id,
-                'exit_reason': standardized_reason,
+                'exit_reason': exit_reason,  # Already "Base SL", "Trailing Stop", etc.
                 'exit_price': exit_price,
                 'quantity': quantity_to_close,
                 'pnl': net_pnl,
@@ -412,33 +428,6 @@ class PositionManager:
             return False
         position = self.positions[position_id]
         return self.close_position_partial(position_id, exit_price, position.current_quantity, timestamp, exit_reason)
-
-    def _standardize_exit_reason(self, exit_reason: str) -> str:
-        """
-        Standardize exit reasons for strategy callbacks.
-        Maps various exit reason strings to standardized format for Control Base SL logic
-        and Price-Above-Exit Filter.
-        """
-        reason_lower = exit_reason.lower()
-        
-        # Map base stop loss variations (including just "stop loss" or "stop")
-        if ('stop' in reason_lower and 'loss' in reason_lower) or reason_lower == 'stop loss':
-            return 'Base SL'
-        
-        # Map take profit variations  
-        if 'take profit' in reason_lower or 'target' in reason_lower:
-            return 'Take Profit'
-            
-        # Map trailing stop variations - CRITICAL for Price-Above-Exit Filter
-        if 'trailing' in reason_lower or 'trail' in reason_lower:
-            return 'Trailing Stop'
-            
-        # Map session end
-        if 'session' in reason_lower:
-            return 'Session End'
-            
-        # Return original for unmapped reasons
-        return exit_reason
 
     def check_exit_conditions(self, position_id: str, current_price: float, timestamp: datetime) -> List[Tuple[int, str]]:
         if position_id not in self.positions:
