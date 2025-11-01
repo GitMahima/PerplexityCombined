@@ -318,6 +318,18 @@ class UnifiedTradingGUI(tk.Tk):
         self.ft_auto_stop_enabled = tk.BooleanVar(value=True)  # Default safety feature
         self.ft_max_trades_per_day = tk.StringVar(value=str(risk_config['max_positions_per_day']))
         self.ft_max_loss_per_day = tk.StringVar(value="500")  # UI-specific default
+        
+        # Session Trade Blocks (from defaults.py)
+        self.ft_trade_block_enabled = tk.BooleanVar(value=session_config.get('trade_block_enabled', False))
+        self.ft_trade_blocks = []  # List of dicts with StringVars for each block
+        # Initialize from config if blocks exist
+        for block in session_config.get('trade_blocks', []):
+            self.ft_trade_blocks.append({
+                'start_hour': tk.StringVar(value=str(block['start_hour'])),
+                'start_min': tk.StringVar(value=str(block['start_min'])),
+                'end_hour': tk.StringVar(value=str(block['end_hour'])),
+                'end_min': tk.StringVar(value=str(block['end_min']))
+            })
 
         # Forward Test Data Simulation (Optional)
         self.ft_use_file_simulation = tk.BooleanVar(value=False)  # Disabled by default - live trading is primary
@@ -609,6 +621,17 @@ class UnifiedTradingGUI(tk.Tk):
         config['session']['start_min'] = int(self.bt_session_start_min.get())
         config['session']['end_hour'] = int(self.bt_session_end_hour.get())
         config['session']['end_min'] = int(self.bt_session_end_min.get())
+        
+        # Trade blocks configuration
+        config['session']['trade_block_enabled'] = self.ft_trade_block_enabled.get()
+        config['session']['trade_blocks'] = []
+        for block in self.ft_trade_blocks:
+            config['session']['trade_blocks'].append({
+                'start_hour': int(block['start_hour'].get()),
+                'start_min': int(block['start_min'].get()),
+                'end_hour': int(block['end_hour'].get()),
+                'end_min': int(block['end_min'].get())
+            })
 
         # Set the data file path for the backtest runner
         config['backtest']['data_path'] = self.bt_data_file.get()
@@ -1058,6 +1081,21 @@ class UnifiedTradingGUI(tk.Tk):
         ttk.Entry(session_frame, textvariable=self.ft_max_trades_per_day, width=6).grid(row=1, column=2, padx=2)
         ttk.Label(session_frame, text="Max Loss/Day:").grid(row=1, column=3, sticky="e", padx=5)
         ttk.Entry(session_frame, textvariable=self.ft_max_loss_per_day, width=8).grid(row=1, column=4, padx=2)
+        
+        # Trade Block Controls
+        ttk.Checkbutton(session_frame, text="Enable Trade Blocks", variable=self.ft_trade_block_enabled).grid(row=2, column=0, columnspan=2, sticky="w", padx=5, pady=(10,2))
+        
+        # Container for dynamic trade block entries
+        self.trade_blocks_container = ttk.Frame(session_frame)
+        self.trade_blocks_container.grid(row=3, column=0, columnspan=5, sticky="ew", padx=5, pady=5)
+        
+        # Add button for new trade blocks
+        add_block_btn = ttk.Button(session_frame, text="➕ Add Trade Block", command=self._add_trade_block_field)
+        add_block_btn.grid(row=4, column=0, columnspan=2, sticky="w", padx=5, pady=2)
+        
+        # Initialize existing blocks in UI
+        self._refresh_trade_blocks_ui()
+        
         row += 1
 
         # === DATA SIMULATION SECTION (OPTIONAL) ===
@@ -1188,6 +1226,72 @@ class UnifiedTradingGUI(tk.Tk):
         if file:
             self.ft_data_file_path.set(file)
             logger.info(f"Selected simulation data file: {file}")
+
+    def _add_trade_block_field(self):
+        """Add a new trade block time entry field"""
+        # Create new block with default values
+        new_block = {
+            'start_hour': tk.StringVar(value="14"),
+            'start_min': tk.StringVar(value="29"),
+            'end_hour': tk.StringVar(value="14"),
+            'end_min': tk.StringVar(value="55")
+        }
+        self.ft_trade_blocks.append(new_block)
+        
+        # Refresh UI to show new block
+        self._refresh_trade_blocks_ui()
+        logger.info(f"Added trade block #{len(self.ft_trade_blocks)}")
+
+    def _remove_trade_block_field(self, block_index):
+        """Remove a trade block field by index"""
+        if 0 <= block_index < len(self.ft_trade_blocks):
+            self.ft_trade_blocks.pop(block_index)
+            self._refresh_trade_blocks_ui()
+            logger.info(f"Removed trade block #{block_index + 1}")
+
+    def _refresh_trade_blocks_ui(self):
+        """Refresh the trade blocks UI display"""
+        # Clear existing widgets
+        for widget in self.trade_blocks_container.winfo_children():
+            widget.destroy()
+        
+        # If no blocks, show placeholder
+        if not self.ft_trade_blocks:
+            placeholder = ttk.Label(self.trade_blocks_container, 
+                                   text="No trade blocks defined. Click '➕ Add Trade Block' to create one.",
+                                   foreground="gray", font=('TkDefaultFont', 9, 'italic'))
+            placeholder.grid(row=0, column=0, sticky="w", padx=5, pady=5)
+            return
+        
+        # Create UI for each block
+        for idx, block in enumerate(self.ft_trade_blocks):
+            block_frame = ttk.Frame(self.trade_blocks_container)
+            block_frame.grid(row=idx, column=0, sticky="ew", padx=5, pady=2)
+            block_frame.columnconfigure(1, weight=1)
+            
+            # Block number label
+            ttk.Label(block_frame, text=f"Block {idx + 1}:", font=('TkDefaultFont', 9, 'bold')).grid(row=0, column=0, sticky="w", padx=(0, 10))
+            
+            # Start time
+            ttk.Label(block_frame, text="Start:").grid(row=0, column=1, sticky="e", padx=2)
+            start_frame = ttk.Frame(block_frame)
+            start_frame.grid(row=0, column=2, sticky="w", padx=2)
+            ttk.Entry(start_frame, textvariable=block['start_hour'], width=3).pack(side='left', padx=1)
+            ttk.Label(start_frame, text=":").pack(side='left')
+            ttk.Entry(start_frame, textvariable=block['start_min'], width=3).pack(side='left', padx=1)
+            
+            # End time
+            ttk.Label(block_frame, text="End:").grid(row=0, column=3, sticky="e", padx=(10, 2))
+            end_frame = ttk.Frame(block_frame)
+            end_frame.grid(row=0, column=4, sticky="w", padx=2)
+            ttk.Entry(end_frame, textvariable=block['end_hour'], width=3).pack(side='left', padx=1)
+            ttk.Label(end_frame, text=":").pack(side='left')
+            ttk.Entry(end_frame, textvariable=block['end_min'], width=3).pack(side='left', padx=1)
+            
+            # Remove button
+            remove_btn = ttk.Button(block_frame, text="❌", width=3, 
+                                   command=lambda i=idx: self._remove_trade_block_field(i))
+            remove_btn.grid(row=0, column=5, sticky="w", padx=(10, 0))
 
     def _bt_run_backtest(self):
         """Run backtest with GUI configuration (enforces frozen config)"""
@@ -2467,6 +2571,17 @@ class UnifiedTradingGUI(tk.Tk):
         config_dict['session']['auto_stop_enabled'] = self.ft_auto_stop_enabled.get()
         config_dict['session']['max_loss_per_day'] = float(self.ft_max_loss_per_day.get())
         
+        # Update trade blocks from forward test GUI
+        config_dict['session']['trade_block_enabled'] = self.ft_trade_block_enabled.get()
+        config_dict['session']['trade_blocks'] = []
+        for block in self.ft_trade_blocks:
+            config_dict['session']['trade_blocks'].append({
+                'start_hour': int(block['start_hour'].get()),
+                'start_min': int(block['start_min'].get()),
+                'end_hour': int(block['end_hour'].get()),
+                'end_min': int(block['end_min'].get())
+            })
+        
         # Fix: Set max trades in the correct location that strategy expects
         config_dict['risk']['max_positions_per_day'] = int(self.ft_max_trades_per_day.get())
         
@@ -2523,6 +2638,10 @@ class UnifiedTradingGUI(tk.Tk):
             logger.info(f"   💰 Capital: {config_dict['capital']['initial_capital']}")
             logger.info(f"   📈 Symbol: {config_dict['instrument']['symbol']}")
             logger.info(f"   🏢 Exchange: {config_dict['instrument']['exchange']}")
+            logger.info(f"   ⏰ Trade Blocks: Enabled={config_dict['session']['trade_block_enabled']}, Count={len(config_dict['session']['trade_blocks'])}")
+            if config_dict['session']['trade_blocks']:
+                for idx, block in enumerate(config_dict['session']['trade_blocks'], 1):
+                    logger.info(f"      Block #{idx}: {block['start_hour']:02d}:{block['start_min']:02d}-{block['end_hour']:02d}:{block['end_min']:02d}")
             
             validation = validate_config(config_dict)
             frozen_config = freeze_config(config_dict)
@@ -3101,6 +3220,31 @@ class UnifiedTradingGUI(tk.Tk):
         lines.append(f"Session End:         {config['session']['end_hour']:02d}:{config['session']['end_min']:02d}")
         lines.append(f"Auto Stop:           {'Enabled' if config['session']['auto_stop_enabled'] else 'Disabled'}")
         lines.append(f"Max Loss/Day:        ₹{config['session']['max_loss_per_day']}")
+        
+        # Trade Blocks Configuration
+        # DEBUG: Log what we're receiving
+        try:
+            trade_block_enabled = config['session'].get('trade_block_enabled', False)
+            trade_blocks = config['session'].get('trade_blocks', [])
+            logger.info(f"[CONFIG DIALOG] Trade blocks - enabled: {trade_block_enabled}, count: {len(trade_blocks)}")
+            if trade_blocks:
+                for idx, block in enumerate(trade_blocks, 1):
+                    logger.info(f"[CONFIG DIALOG]   Block #{idx}: {block}")
+        except Exception as e:
+            logger.error(f"[CONFIG DIALOG] Error accessing trade blocks: {e}", exc_info=True)
+            trade_block_enabled = False
+            trade_blocks = []
+        
+        if trade_block_enabled and trade_blocks:
+            lines.append(f"Trade Blocks:        ENABLED ({len(trade_blocks)} blocks)")
+            for idx, block in enumerate(trade_blocks, 1):
+                block_str = f"{block['start_hour']:02d}:{block['start_min']:02d}-{block['end_hour']:02d}:{block['end_min']:02d}"
+                lines.append(f"  Block #{idx}:        {block_str}")
+        elif trade_block_enabled and not trade_blocks:
+            lines.append(f"Trade Blocks:        ENABLED (0 blocks configured)")
+        else:
+            lines.append(f"Trade Blocks:        DISABLED")
+        
         lines.append("")
         
         # Risk & Capital

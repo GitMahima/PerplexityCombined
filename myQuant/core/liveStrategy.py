@@ -130,6 +130,10 @@ class ModularIntradayStrategy:
         self.max_positions_per_day = self.config_accessor.get_risk_param('max_positions_per_day')
         self.no_trade_start_minutes = self.config_accessor.get_session_param('no_trade_start_minutes')
         self.no_trade_end_minutes = self.config_accessor.get_session_param('no_trade_end_minutes')
+        
+        # Session Trade Blocks configuration
+        self.trade_block_enabled = self.config_accessor.get_session_param('trade_block_enabled')
+        self.trade_blocks = self.config_accessor.get_session_param('trade_blocks')
 
         # Get timezone setting with fail-fast behavior
         try:
@@ -221,6 +225,41 @@ class ModularIntradayStrategy:
         # Direct comparison using the simplified function
         return is_within_session(current_time, self.session_start, self.session_end)
 
+    def is_within_trade_block(self, current_time: datetime) -> Tuple[bool, str]:
+        """
+        Check if current time is within any configured trade block period.
+        
+        Args:
+            current_time: Current timestamp to check
+            
+        Returns:
+            Tuple[bool, str]: (is_blocked, block_description)
+                - is_blocked: True if within a trade block
+                - block_description: String describing which block (for logging)
+        """
+        # Master switch check - fail-fast if disabled
+        if not self.trade_block_enabled:
+            return False, ""
+        
+        # Convert current time to minutes since midnight for comparison
+        current_minutes = current_time.hour * 60 + current_time.minute
+        
+        # Check each configured block
+        for idx, block in enumerate(self.trade_blocks):
+            start_minutes = block['start_hour'] * 60 + block['start_min']
+            end_minutes = block['end_hour'] * 60 + block['end_min']
+            
+            # Check if current time falls within this block
+            if start_minutes <= current_minutes <= end_minutes:
+                block_desc = (
+                    f"Block #{idx + 1} "
+                    f"({block['start_hour']:02d}:{block['start_min']:02d}-"
+                    f"{block['end_hour']:02d}:{block['end_min']:02d})"
+                )
+                return True, block_desc
+        
+        return False, ""
+
     def can_enter_new_position(self, current_time: datetime, current_price: float) -> bool:
         """
         Unified entry validation - ALL gating conditions in one place.
@@ -233,6 +272,12 @@ class ModularIntradayStrategy:
             True if can enter new position, False if blocked by any condition
         """
         gating_reasons = []
+        
+        # Check trade blocks FIRST (highest priority - user-defined restriction)
+        is_blocked, block_desc = self.is_within_trade_block(current_time)
+        if is_blocked:
+            gating_reasons.append(f"Within trade block: {block_desc}")
+        
         if not self.is_trading_session(current_time):
             gating_reasons.append(f"Not in trading session (now={current_time.time()}, allowed={self.session_start}-{self.session_end})")
         buffer_start, buffer_end = self.get_effective_session_times()

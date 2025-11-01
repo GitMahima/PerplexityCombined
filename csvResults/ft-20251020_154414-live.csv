@@ -1,0 +1,22 @@
+Unnamed: 0,FORWARD TEST RESULTS DASHBOARD,Unnamed: 2,Unnamed: 3,Unnamed: 4,Unnamed: 5,Unnamed: 6,Unnamed: 7,Unnamed: 8,Unnamed: 9,Unnamed: 10,Unnamed: 11
+,,,,,,,,,,,
+,Mode: LIVE | Generated: 2025-10-20 15:44:14,,,,,,,,,,
+,,,,,,,,,,,
+,,,NET P&L,,,,,,,,
+,,,"-99,233.38",,,,,,,,
+,,,,,,,,,,,
+,PERFORMANCE SUMMARY,,,,,,,,,,
+,,Winning Trades,2,,,,Total Trades,4,,,
+,,Win Rate,50.00%,,,,Losing Trades,2,,,
+,,Net P&L,"-99,233.38",,,,Gross P&L,"-99,233.38",,,
+,,Best Trade,"7,180.76",,,,Profit Factor,0.08,,,
+,,Initial Capital,"100,000.00",,,,Worst Trade,"-56,277.57",,,
+,,Return %,-99.23%,,,,Final Capital,766.62,,,
+,,,,,,,,,,,
+,,,,,,,,,,,
+,DETAILED TRADES LOG,,,,,,,,,,
+,#,Entry Time,Exit Time,Entry Price,Exit Price,Qty,Gross PnL,Commission,Net PnL,Exit Reason,Duration (min)
+,1,2025-10-20 11:54:13,2025-10-20 12:34:32,26.5,11.5,3750,-56250,27.57,-56277.57,Stop Loss,40
+,2,2025-10-20 12:37:36,2025-10-20 14:28:35,11.95,17,1425,7196.25,15.49,7180.76,Take Profit 1,110
+,3,2025-10-20 12:37:36,2025-10-20 14:29:36,11.95,12.65,2175,1522.5,17.59,1504.91,Trailing Stop,112
+,4,2025-10-20 14:30:06,2025-10-20 15:10:00,14.75,0.1,3525,-51641.25,0.23,-51641.48,Session End,39

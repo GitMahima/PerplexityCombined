@@ -257,7 +257,10 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "end_buffer_minutes": 40,
         "no_trade_start_minutes": 5,
         "no_trade_end_minutes": 10,
-        "timezone": "Asia/Kolkata"
+        "timezone": "Asia/Kolkata",
+        # Session Trade Blocks - User-defined time periods where trading is blocked
+        "trade_block_enabled": False,  # Master switch for trade blocking feature
+        "trade_blocks": []  # List of dicts: [{"start_hour": 14, "start_min": 29, "end_hour": 14, "end_min": 55}, ...]
     },
     "backtest": {
         "allow_short": False,

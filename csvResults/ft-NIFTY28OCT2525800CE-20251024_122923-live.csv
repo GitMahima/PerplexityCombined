@@ -1,0 +1,19 @@
+Unnamed: 0,FORWARD TEST RESULTS DASHBOARD,Unnamed: 2,Unnamed: 3,Unnamed: 4,Unnamed: 5,Unnamed: 6,Unnamed: 7,Unnamed: 8,Unnamed: 9,Unnamed: 10,Unnamed: 11
+,,,,,,,,,,,
+,Mode: LIVE | Generated: 2025-10-24 12:29:23,,,,,,,,,,
+,,,,,,,,,,,
+,,,NET P&L,,,,,,,,
+,,,-15.36,,,,,,,,
+,,,,,,,,,,,
+,PERFORMANCE SUMMARY,,,,,,,,,,
+,,Winning Trades,0,,,,Total Trades,1,,,
+,,Win Rate,0.00%,,,,Losing Trades,1,,,
+,,Net P&L,-15.36,,,,Gross P&L,-15.36,,,
+,,Best Trade,-15.36,,,,Profit Factor,0.00,,,
+,,Initial Capital,"100,000.00",,,,Worst Trade,-15.36,,,
+,,Return %,-0.02%,,,,Final Capital,"99,984.64",,,
+,,,,,,,,,,,
+,,,,,,,,,,,
+,DETAILED TRADES LOG,,,,,,,,,,
+,#,Entry Time,Exit Time,Entry Price,Exit Price,Qty,Gross PnL,Commission,Net PnL,Exit Reason,Duration (min)
+,1,2025-10-24 12:29:22,2025-10-24 12:29:23,160.2,160.2,150,0,15.36,-15.36,Stop Requested,0
