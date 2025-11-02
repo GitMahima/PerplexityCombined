@@ -19,6 +19,7 @@ state directly controls both the logical enable/disable state AND the visual
 expand/collapse state of parameter sections.
 """
 import subprocess
+import sys
 import os
 import json
 import threading
@@ -308,6 +309,13 @@ class UnifiedTradingGUI(tk.Tk):
         self.ft_price_above_exit_filter_enabled = tk.BooleanVar(value=risk_config['price_above_exit_filter_enabled'])
         self.ft_price_buffer_points = tk.StringVar(value=str(risk_config['price_buffer_points']))
         self.ft_filter_duration_seconds = tk.StringVar(value=str(risk_config['filter_duration_seconds']))
+
+        # Forward Test SL Regression (from defaults.py)
+        self.ft_sl_regression_enabled = tk.BooleanVar(value=risk_config['sl_regression_enabled'])
+        self.ft_max_base_sl = tk.StringVar(value=str(risk_config['max_base_sl']))
+        self.ft_min_base_sl = tk.StringVar(value=str(risk_config['min_base_sl']))
+        self.ft_sl_regression_step = tk.StringVar(value=str(risk_config['sl_regression_step']))
+        self.ft_sl_regression_window_minutes = tk.StringVar(value=str(risk_config['sl_regression_window_minutes']))
 
         # Forward Test Session management (from defaults.py)
         self.ft_is_intraday = tk.BooleanVar(value=session_config['is_intraday'])
@@ -715,6 +723,28 @@ class UnifiedTradingGUI(tk.Tk):
     def _build_forward_test_tab(self):
         frame = self.ft_tab
         
+        # Create sub-notebook for Single Test vs Matrix Test
+        self.ft_notebook = ttk.Notebook(frame)
+        
+        # Create tab frames
+        self.ft_single_tab = ttk.Frame(self.ft_notebook)
+        self.ft_matrix_tab = ttk.Frame(self.ft_notebook)
+        
+        # Add tabs
+        self.ft_notebook.add(self.ft_single_tab, text="   Single Test   ")
+        self.ft_notebook.add(self.ft_matrix_tab, text="   Matrix Test   ")
+        
+        # Pack notebook
+        self.ft_notebook.pack(expand=1, fill="both")
+        
+        # Build both tabs
+        self._build_ft_single_test_tab()
+        self._build_ft_matrix_test_tab()
+
+    def _build_ft_single_test_tab(self):
+        """Build the single forward test tab (existing functionality)"""
+        frame = self.ft_single_tab
+        
         # Add scrollable frame for the main content
         canvas = tk.Canvas(frame, highlightthickness=0)
         scrollbar = ttk.Scrollbar(frame, orient="vertical", command=canvas.yview)
@@ -1043,7 +1073,38 @@ class UnifiedTradingGUI(tk.Tk):
         ttk.Label(filter_frame, text="sec").grid(row=0, column=6, sticky="w", padx=2)
         row += 1
 
-        # Add separator between Filter and Session Management
+        # === SL REGRESSION SECTION ===
+        ttk.Label(parent, text="📉 SL Regression (Adaptive Base SL)", style='SectionHeader.TLabel').grid(row=row, column=0, columnspan=2, sticky="w", pady=(15,5))
+        row += 1
+        
+        sl_regression_frame = ttk.Frame(parent)
+        sl_regression_frame.grid(row=row, column=0, columnspan=2, sticky="ew", padx=10, pady=5)
+        
+        # Enable checkbox
+        ttk.Checkbutton(sl_regression_frame, text="Enable SL Regression", variable=self.ft_sl_regression_enabled).grid(row=0, column=0, sticky="w", padx=5, pady=2)
+        
+        # Max Base SL
+        ttk.Label(sl_regression_frame, text="Max SL:").grid(row=0, column=1, sticky="e", padx=2)
+        ttk.Entry(sl_regression_frame, textvariable=self.ft_max_base_sl, width=6).grid(row=0, column=2, padx=2)
+        ttk.Label(sl_regression_frame, text="pts").grid(row=0, column=3, sticky="w", padx=2)
+        
+        # Min Base SL
+        ttk.Label(sl_regression_frame, text="Min SL:").grid(row=0, column=4, sticky="e", padx=(10,2))
+        ttk.Entry(sl_regression_frame, textvariable=self.ft_min_base_sl, width=6).grid(row=0, column=5, padx=2)
+        ttk.Label(sl_regression_frame, text="pts").grid(row=0, column=6, sticky="w", padx=2)
+        
+        # Step (row 2)
+        ttk.Label(sl_regression_frame, text="Step:").grid(row=1, column=1, sticky="e", padx=2)
+        ttk.Entry(sl_regression_frame, textvariable=self.ft_sl_regression_step, width=6).grid(row=1, column=2, padx=2)
+        ttk.Label(sl_regression_frame, text="pts").grid(row=1, column=3, sticky="w", padx=2)
+        
+        # Window
+        ttk.Label(sl_regression_frame, text="Window:").grid(row=1, column=4, sticky="e", padx=(10,2))
+        ttk.Entry(sl_regression_frame, textvariable=self.ft_sl_regression_window_minutes, width=6).grid(row=1, column=5, padx=2)
+        ttk.Label(sl_regression_frame, text="min").grid(row=1, column=6, sticky="w", padx=2)
+        row += 1
+
+        # Add separator between SL Regression and Session Management
         self._add_grid_separator(parent, row)
         row += 1
 
@@ -2111,6 +2172,153 @@ class UnifiedTradingGUI(tk.Tk):
         # Run button
         ttk.Button(button_frame, text="Run Backtest", command=self._bt_run_backtest, style='RunBacktest.TButton').pack(side='left')
 
+    def _build_ft_matrix_test_tab(self):
+        """Build the matrix testing tab for parameter optimization"""
+        frame = self.ft_matrix_tab
+        
+        # Add scrollable frame
+        canvas = tk.Canvas(frame, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(frame, orient="vertical", command=canvas.yview)
+        scrollable_frame = ttk.Frame(canvas)
+        
+        scrollable_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        
+        # Configure layout
+        scrollable_frame.columnconfigure(0, weight=1)
+        scrollable_frame.columnconfigure(1, weight=1)
+        
+        # Main container
+        main_container = ttk.Frame(scrollable_frame)
+        main_container.grid(row=0, column=0, columnspan=2, sticky="nsew", padx=10, pady=10)
+        main_container.columnconfigure(0, weight=1)
+        
+        row = 0
+        
+        # === HEADER ===
+        header_label = ttk.Label(main_container, text="🔬 Matrix Parameter Testing", font=('Segoe UI', 14, 'bold'))
+        header_label.grid(row=row, column=0, sticky="w", pady=(0,10))
+        row += 1
+        
+        info_label = ttk.Label(main_container, text="Test multiple parameter combinations systematically to find optimal settings.", 
+                              foreground='gray', font=('Segoe UI', 9))
+        info_label.grid(row=row, column=0, sticky="w", pady=(0,15))
+        row += 1
+        
+        # === DATA SOURCE SECTION ===
+        data_frame = ttk.LabelFrame(main_container, text="Data Source", padding=10)
+        data_frame.grid(row=row, column=0, sticky="ew", pady=(0,10))
+        data_frame.columnconfigure(1, weight=1)
+        row += 1
+        
+        ttk.Label(data_frame, text="CSV File:").grid(row=0, column=0, sticky="e", padx=5, pady=5)
+        self.matrix_csv_path = tk.StringVar(value="")
+        csv_entry = ttk.Entry(data_frame, textvariable=self.matrix_csv_path, width=50)
+        csv_entry.grid(row=0, column=1, sticky="ew", padx=5, pady=5)
+        
+        ttk.Button(data_frame, text="Browse...", command=self._matrix_browse_csv).grid(row=0, column=2, padx=5, pady=5)
+        
+        ttk.Label(data_frame, text="Output Dir:").grid(row=1, column=0, sticky="e", padx=5, pady=5)
+        self.matrix_output_dir = tk.StringVar(value="results")
+        ttk.Entry(data_frame, textvariable=self.matrix_output_dir, width=50).grid(row=1, column=1, sticky="ew", padx=5, pady=5)
+        ttk.Button(data_frame, text="Browse...", command=self._matrix_browse_output).grid(row=1, column=2, padx=5, pady=5)
+        
+        # === TEST CONFIGURATION ===
+        config_frame = ttk.LabelFrame(main_container, text="Test Configuration", padding=10)
+        config_frame.grid(row=row, column=0, sticky="ew", pady=(0,10))
+        config_frame.columnconfigure(1, weight=1)
+        row += 1
+        
+        ttk.Label(config_frame, text="Phase Name:").grid(row=0, column=0, sticky="e", padx=5, pady=5)
+        self.matrix_phase_name = tk.StringVar(value="Matrix Test Phase 1")
+        ttk.Entry(config_frame, textvariable=self.matrix_phase_name, width=50).grid(row=0, column=1, sticky="ew", padx=5, pady=5)
+        
+        ttk.Label(config_frame, text="Description:").grid(row=1, column=0, sticky="ne", padx=5, pady=5)
+        self.matrix_description = tk.Text(config_frame, height=3, width=50, wrap=tk.WORD)
+        self.matrix_description.grid(row=1, column=1, sticky="ew", padx=5, pady=5)
+        
+        # === PARAMETER GRIDS ===
+        params_frame = ttk.LabelFrame(main_container, text="Parameter Grids (comma-separated values)", padding=10)
+        params_frame.grid(row=row, column=0, sticky="ew", pady=(0,10))
+        params_frame.columnconfigure(1, weight=1)
+        row += 1
+        
+        # Strategy Parameters
+        ttk.Label(params_frame, text="Strategy", font=('Segoe UI', 10, 'bold')).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0,5))
+        
+        ttk.Label(params_frame, text="Fast EMA:").grid(row=1, column=0, sticky="e", padx=5, pady=2)
+        self.matrix_fast_ema = tk.StringVar(value="")
+        ttk.Entry(params_frame, textvariable=self.matrix_fast_ema, width=40).grid(row=1, column=1, sticky="ew", padx=5, pady=2)
+        
+        ttk.Label(params_frame, text="Slow EMA:").grid(row=2, column=0, sticky="e", padx=5, pady=2)
+        self.matrix_slow_ema = tk.StringVar(value="")
+        ttk.Entry(params_frame, textvariable=self.matrix_slow_ema, width=40).grid(row=2, column=1, sticky="ew", padx=5, pady=2)
+        
+        ttk.Label(params_frame, text="Green Bars:").grid(row=3, column=0, sticky="e", padx=5, pady=2)
+        self.matrix_green_bars = tk.StringVar(value="")
+        ttk.Entry(params_frame, textvariable=self.matrix_green_bars, width=40).grid(row=3, column=1, sticky="ew", padx=5, pady=2)
+        
+        # Risk Parameters
+        ttk.Label(params_frame, text="Risk Management", font=('Segoe UI', 10, 'bold')).grid(row=4, column=0, columnspan=2, sticky="w", pady=(10,5))
+        
+        ttk.Label(params_frame, text="Base SL (pts):").grid(row=5, column=0, sticky="e", padx=5, pady=2)
+        self.matrix_base_sl = tk.StringVar(value="")
+        ttk.Entry(params_frame, textvariable=self.matrix_base_sl, width=40).grid(row=5, column=1, sticky="ew", padx=5, pady=2)
+        
+        ttk.Label(params_frame, text="Trail Activation:").grid(row=6, column=0, sticky="e", padx=5, pady=2)
+        self.matrix_trail_activation = tk.StringVar(value="")
+        ttk.Entry(params_frame, textvariable=self.matrix_trail_activation, width=40).grid(row=6, column=1, sticky="ew", padx=5, pady=2)
+        
+        ttk.Label(params_frame, text="Trail Distance:").grid(row=7, column=0, sticky="e", padx=5, pady=2)
+        self.matrix_trail_distance = tk.StringVar(value="")
+        ttk.Entry(params_frame, textvariable=self.matrix_trail_distance, width=40).grid(row=7, column=1, sticky="ew", padx=5, pady=2)
+        
+        # Filter Parameters
+        ttk.Label(params_frame, text="Filters", font=('Segoe UI', 10, 'bold')).grid(row=8, column=0, columnspan=2, sticky="w", pady=(10,5))
+        
+        ttk.Label(params_frame, text="Price Buffer:").grid(row=9, column=0, sticky="e", padx=5, pady=2)
+        self.matrix_price_buffer = tk.StringVar(value="")
+        ttk.Entry(params_frame, textvariable=self.matrix_price_buffer, width=40).grid(row=9, column=1, sticky="ew", padx=5, pady=2)
+        
+        ttk.Label(params_frame, text="Filter Duration:").grid(row=10, column=0, sticky="e", padx=5, pady=2)
+        self.matrix_filter_duration = tk.StringVar(value="")
+        ttk.Entry(params_frame, textvariable=self.matrix_filter_duration, width=40).grid(row=10, column=1, sticky="ew", padx=5, pady=2)
+        
+        # === FIXED PARAMETERS ===
+        fixed_frame = ttk.LabelFrame(main_container, text="Fixed Parameters (held constant)", padding=10)
+        fixed_frame.grid(row=row, column=0, sticky="ew", pady=(0,10))
+        fixed_frame.columnconfigure(0, weight=1)
+        row += 1
+        
+        # Container for dynamic fixed parameter entries
+        self.matrix_fixed_params_container = ttk.Frame(fixed_frame)
+        self.matrix_fixed_params_container.grid(row=0, column=0, sticky="ew")
+        self.matrix_fixed_params_list = []  # List to store (name_var, value_var) tuples
+        
+        # Add initial fixed parameter row
+        self._matrix_add_fixed_param_row()
+        
+        # Add button
+        ttk.Button(fixed_frame, text="+ Add Fixed Parameter", command=self._matrix_add_fixed_param_row).grid(row=1, column=0, sticky="w", pady=(5,0))
+        
+        # === ACTIONS ===
+        action_frame = ttk.Frame(main_container)
+        action_frame.grid(row=row, column=0, sticky="ew", pady=(10,0))
+        row += 1
+        
+        ttk.Button(action_frame, text="▶ Run Matrix Test", command=self._matrix_run_test, 
+                  style='RunBacktest.TButton').pack(side='left', padx=(0,10))
+        
+        self.matrix_status = tk.StringVar(value="Ready")
+        ttk.Label(action_frame, textvariable=self.matrix_status, foreground='gray').pack(side='left')
+        
+        # Mousewheel binding
+        canvas.bind_all("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
+
     def _build_monitor_tab(self):
         """Build the dedicated monitoring tab for forward test visual feedback"""
         frame = self.monitor_tab
@@ -2439,10 +2647,6 @@ class UnifiedTradingGUI(tk.Tk):
         from ..config.defaults import DEFAULT_CONFIG
         config_dict = deepcopy(DEFAULT_CONFIG)  # Fresh baseline from defaults
         
-        # DEBUG: Verify SL Regression params are in deepcopy
-        logger.warning(f"[CONFIG DEBUG] After deepcopy, sl_regression_enabled = {config_dict.get('risk', {}).get('sl_regression_enabled', 'MISSING')}")
-        logger.warning(f"[CONFIG DEBUG] risk keys after deepcopy: {list(config_dict.get('risk', {}).keys())}")
-        
         # 1. INSTRUMENT SELECTION (Primary - determines lot_size from SSOT)
         selected_instrument = self.ft_instrument_type.get()
         
@@ -2557,6 +2761,13 @@ class UnifiedTradingGUI(tk.Tk):
         config_dict['risk']['price_above_exit_filter_enabled'] = self.ft_price_above_exit_filter_enabled.get()
         config_dict['risk']['price_buffer_points'] = float(self.ft_price_buffer_points.get())
         config_dict['risk']['filter_duration_seconds'] = int(self.ft_filter_duration_seconds.get())
+
+        # Update SL Regression from forward test GUI
+        config_dict['risk']['sl_regression_enabled'] = self.ft_sl_regression_enabled.get()
+        config_dict['risk']['max_base_sl'] = float(self.ft_max_base_sl.get())
+        config_dict['risk']['min_base_sl'] = float(self.ft_min_base_sl.get())
+        config_dict['risk']['sl_regression_step'] = float(self.ft_sl_regression_step.get())
+        config_dict['risk']['sl_regression_window_minutes'] = int(self.ft_sl_regression_window_minutes.get())
 
         # Update take profit from forward test GUI
         if self.ft_use_take_profit.get():
@@ -3133,6 +3344,277 @@ class UnifiedTradingGUI(tk.Tk):
             messagebox.showerror("Export Error", f"Failed to start export:\n{e}")
             self._update_ft_result_box(f"Export error: {e}\n", "live")
 
+    # -------------------- Matrix Test Helper Methods --------------------
+    
+    def _matrix_browse_csv(self):
+        """Browse and select CSV file for matrix testing"""
+        from tkinter import filedialog
+        
+        filepath = filedialog.askopenfilename(
+            title="Select CSV File for Matrix Testing",
+            filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")],
+            initialdir=os.path.dirname(self.matrix_csv_path.get()) if self.matrix_csv_path.get() else os.getcwd()
+        )
+        
+        if filepath:
+            self.matrix_csv_path.set(filepath)
+            logger.info(f"Matrix test CSV selected: {filepath}")
+    
+    def _matrix_browse_output(self):
+        """Browse and select output directory for matrix test results"""
+        from tkinter import filedialog
+        
+        dirpath = filedialog.askdirectory(
+            title="Select Output Directory for Matrix Test Results",
+            initialdir=self.matrix_output_dir.get() if self.matrix_output_dir.get() else os.getcwd()
+        )
+        
+        if dirpath:
+            self.matrix_output_dir.set(dirpath)
+            logger.info(f"Matrix test output directory selected: {dirpath}")
+    
+    def _matrix_add_fixed_param_row(self):
+        """Add a new row for fixed parameter entry"""
+        # Create new frame for this parameter row
+        row_frame = ttk.Frame(self.matrix_fixed_params_container)
+        row_frame.pack(fill='x', pady=2)
+        
+        # Create StringVars for this row
+        param_name_var = tk.StringVar(value="")
+        param_value_var = tk.StringVar(value="")
+        
+        # Parameter name entry
+        ttk.Label(row_frame, text="Name:", width=8).pack(side='left', padx=(0, 5))
+        name_entry = ttk.Entry(row_frame, textvariable=param_name_var, width=20)
+        name_entry.pack(side='left', padx=(0, 10))
+        
+        # Parameter value entry
+        ttk.Label(row_frame, text="Value:", width=6).pack(side='left', padx=(0, 5))
+        value_entry = ttk.Entry(row_frame, textvariable=param_value_var, width=15)
+        value_entry.pack(side='left', padx=(0, 10))
+        
+        # Delete button
+        def delete_row():
+            # Remove from list
+            if (param_name_var, param_value_var, row_frame) in self.matrix_fixed_params_list:
+                self.matrix_fixed_params_list.remove((param_name_var, param_value_var, row_frame))
+            # Destroy frame
+            row_frame.destroy()
+        
+        delete_btn = ttk.Button(row_frame, text="Delete", command=delete_row, width=8)
+        delete_btn.pack(side='left')
+        
+        # Add to tracking list
+        self.matrix_fixed_params_list.append((param_name_var, param_value_var, row_frame))
+        
+        logger.debug(f"Added fixed parameter row (total: {len(self.matrix_fixed_params_list)})")
+    
+    def _matrix_run_test(self):
+        """Execute matrix test with current configuration"""
+        from threading import Thread
+        import subprocess
+        
+        try:
+            # Validate inputs
+            csv_path = self.matrix_csv_path.get().strip()
+            output_dir = self.matrix_output_dir.get().strip()
+            phase_name = self.matrix_phase_name.get().strip()
+            
+            if not csv_path:
+                messagebox.showerror("Validation Error", "Please select a CSV file for matrix testing.")
+                return
+            
+            if not os.path.isfile(csv_path):
+                messagebox.showerror("File Not Found", f"CSV file not found:\n{csv_path}")
+                return
+            
+            if not output_dir:
+                messagebox.showerror("Validation Error", "Please select an output directory for results.")
+                return
+            
+            if not phase_name:
+                messagebox.showerror("Validation Error", "Please provide a phase name for this matrix test.")
+                return
+            
+            # Get description
+            description = self.matrix_description.get("1.0", tk.END).strip()
+            
+            # Parse parameter grids
+            parameter_grids = {}
+            
+            # Strategy parameters
+            if self.matrix_fast_ema.get().strip():
+                try:
+                    parameter_grids['fast_ema'] = [int(x.strip()) for x in self.matrix_fast_ema.get().split(',')]
+                except ValueError:
+                    messagebox.showerror("Parse Error", "fast_ema must be comma-separated integers (e.g., '9,12,18')")
+                    return
+            
+            if self.matrix_slow_ema.get().strip():
+                try:
+                    parameter_grids['slow_ema'] = [int(x.strip()) for x in self.matrix_slow_ema.get().split(',')]
+                except ValueError:
+                    messagebox.showerror("Parse Error", "slow_ema must be comma-separated integers")
+                    return
+            
+            if self.matrix_green_bars.get().strip():
+                try:
+                    parameter_grids['green_bars'] = [int(x.strip()) for x in self.matrix_green_bars.get().split(',')]
+                except ValueError:
+                    messagebox.showerror("Parse Error", "green_bars must be comma-separated integers")
+                    return
+            
+            # Risk parameters
+            if self.matrix_base_sl.get().strip():
+                try:
+                    parameter_grids['base_sl'] = [float(x.strip()) for x in self.matrix_base_sl.get().split(',')]
+                except ValueError:
+                    messagebox.showerror("Parse Error", "base_sl must be comma-separated numbers")
+                    return
+            
+            if self.matrix_trail_activation.get().strip():
+                try:
+                    parameter_grids['trail_activation'] = [float(x.strip()) for x in self.matrix_trail_activation.get().split(',')]
+                except ValueError:
+                    messagebox.showerror("Parse Error", "trail_activation must be comma-separated numbers")
+                    return
+            
+            if self.matrix_trail_distance.get().strip():
+                try:
+                    parameter_grids['trail_distance'] = [float(x.strip()) for x in self.matrix_trail_distance.get().split(',')]
+                except ValueError:
+                    messagebox.showerror("Parse Error", "trail_distance must be comma-separated numbers")
+                    return
+            
+            # Filter parameters
+            if self.matrix_price_buffer.get().strip():
+                try:
+                    parameter_grids['price_buffer'] = [float(x.strip()) for x in self.matrix_price_buffer.get().split(',')]
+                except ValueError:
+                    messagebox.showerror("Parse Error", "price_buffer must be comma-separated numbers")
+                    return
+            
+            if self.matrix_filter_duration.get().strip():
+                try:
+                    parameter_grids['filter_duration'] = [int(x.strip()) for x in self.matrix_filter_duration.get().split(',')]
+                except ValueError:
+                    messagebox.showerror("Parse Error", "filter_duration must be comma-separated integers")
+                    return
+            
+            # Check at least one parameter grid is defined
+            if not parameter_grids:
+                messagebox.showerror("Validation Error", "Please define at least one parameter grid to test.")
+                return
+            
+            # Collect fixed parameters
+            fixed_parameters = {}
+            for param_name_var, param_value_var, _ in self.matrix_fixed_params_list:
+                name = param_name_var.get().strip()
+                value_str = param_value_var.get().strip()
+                
+                if not name or not value_str:
+                    continue  # Skip empty rows
+                
+                # Try to parse value as numeric
+                try:
+                    # Try int first
+                    if '.' not in value_str:
+                        fixed_parameters[name] = int(value_str)
+                    else:
+                        fixed_parameters[name] = float(value_str)
+                except ValueError:
+                    # Keep as string
+                    fixed_parameters[name] = value_str
+            
+            # Log test configuration
+            logger.info(f"Starting matrix test: {phase_name}")
+            logger.info(f"CSV: {csv_path}")
+            logger.info(f"Output: {output_dir}")
+            logger.info(f"Parameter grids: {parameter_grids}")
+            logger.info(f"Fixed parameters: {fixed_parameters}")
+            
+            # Update status
+            total_combinations = 1
+            for values in parameter_grids.values():
+                total_combinations *= len(values)
+            
+            self.matrix_status.config(text=f"Status: Running {total_combinations} test combinations...")
+            
+            # Run matrix test in background thread
+            def run_matrix():
+                try:
+                    # Import MatrixTestRunner
+                    from myQuant.live.matrix_forward_test import MatrixTestRunner
+                    
+                    # Create runner
+                    runner = MatrixTestRunner(csv_path, output_dir)
+                    
+                    # Add parameter grids
+                    for param_name, param_values in parameter_grids.items():
+                        runner.add_parameter_grid(param_name, param_values)
+                    
+                    # Set fixed parameters
+                    for param_name, param_value in fixed_parameters.items():
+                        runner.set_fixed_parameter(param_name, param_value)
+                    
+                    # Run tests
+                    results_df = runner.run(phase_name=phase_name, description=description)
+                    
+                    # Update UI on completion
+                    self.after(0, lambda: self._matrix_test_complete(runner.results_exporter.excel_filepath, total_combinations))
+                    
+                except Exception as e:
+                    logger.exception(f"Matrix test execution failed: {e}")
+                    self.after(0, lambda: self._matrix_test_error(str(e)))
+            
+            # Start background thread
+            test_thread = Thread(target=run_matrix, daemon=True)
+            test_thread.start()
+            
+            logger.info("Matrix test started in background thread")
+            
+        except Exception as e:
+            logger.exception(f"Failed to start matrix test: {e}")
+            messagebox.showerror("Matrix Test Error", f"Failed to start matrix test:\n{e}")
+            self.matrix_status.config(text="Status: Error - see logs")
+    
+    def _matrix_test_complete(self, excel_filepath, total_combinations):
+        """Called when matrix test completes successfully"""
+        self.matrix_status.config(text=f"Status: ✓ Completed {total_combinations} tests successfully")
+        
+        # Show completion dialog
+        result = messagebox.askyesno(
+            "Matrix Test Complete",
+            f"Matrix test completed successfully!\n\n"
+            f"Results saved to:\n{excel_filepath}\n\n"
+            f"Would you like to open the results file?"
+        )
+        
+        if result:
+            # Open Excel file in default application
+            try:
+                if os.name == 'nt':  # Windows
+                    os.startfile(excel_filepath)
+                elif os.name == 'posix':  # macOS/Linux
+                    import subprocess
+                    if sys.platform == 'darwin':
+                        subprocess.call(['open', excel_filepath])
+                    else:
+                        subprocess.call(['xdg-open', excel_filepath])
+                logger.info(f"Opened matrix test results: {excel_filepath}")
+            except Exception as e:
+                logger.exception(f"Failed to open results file: {e}")
+                messagebox.showerror("Open Error", f"Could not open results file:\n{e}")
+    
+    def _matrix_test_error(self, error_msg):
+        """Called when matrix test encounters an error"""
+        self.matrix_status.config(text="Status: ❌ Error - see details")
+        messagebox.showerror(
+            "Matrix Test Failed",
+            f"Matrix test encountered an error:\n\n{error_msg}\n\n"
+            f"Check logs for details."
+        )
+
     def _show_config_review_dialog(self, config, data_source_msg, data_detail_msg, warning_msg):
         """Show comprehensive configuration review dialog before starting forward test"""
         
@@ -3334,6 +3816,24 @@ class UnifiedTradingGUI(tk.Tk):
         else:
             lines.append(f"Status:              DISABLED")
             lines.append(f"Description:         Re-entry allowed immediately after any exit")
+        
+        lines.append("")
+        
+        # SL Regression Configuration
+        lines.append("SL REGRESSION (ADAPTIVE BASE SL)")
+        lines.append("-" * 40)
+        if risk_cfg.get('sl_regression_enabled', False):
+            lines.append(f"Status:              ENABLED")
+            lines.append(f"Max Base SL:         {risk_cfg['max_base_sl']} points (normal conditions)")
+            lines.append(f"Min Base SL:         {risk_cfg['min_base_sl']} points (floor)")
+            lines.append(f"Reduction Step:      {risk_cfg['sl_regression_step']} points per SL exit")
+            lines.append(f"Reversion Window:    {risk_cfg['sl_regression_window_minutes']} minutes")
+            lines.append(f"Description:         After any SL exit (Base or Trailing), Base SL")
+            lines.append(f"                     reduces by {risk_cfg['sl_regression_step']} points. Reverts to max after")
+            lines.append(f"                     {risk_cfg['sl_regression_window_minutes']} min with no SL exits.")
+        else:
+            lines.append(f"Status:              DISABLED")
+            lines.append(f"Description:         Base SL remains constant at configured value")
         
         lines.append("")
         
